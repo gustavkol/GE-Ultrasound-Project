@@ -42,7 +42,3 @@ for i = 1:length(n)
     end
 end
 hold off;
-
-
-
-
