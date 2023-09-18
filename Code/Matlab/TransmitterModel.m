@@ -27,9 +27,10 @@ end
 
 for i = 1:length(n)
     delta_delay(i) = delay(i)-delay(32);
+    k(i) = n(i) * p;
 end
 
-polarscatter(0,k,".",'black'); hold on;
+%polarscatter(0,k,".",'black'); hold on;
 polarscatter(angle, R_0,'filled','blue'); hold on;
 polarplot([angle,angle], [0,R_0],'red'); hold on;
 

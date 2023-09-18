@@ -4,7 +4,8 @@ lastAngle = 90; % Last angle
 
 for angle = initAngle : lastAngle
     % Initialization values
-    B_0 = (angle/180)*pi;                   % Angle for wanted cos(theta)
+    B_0 = (angle/180)*pi;
+    x_0 = 1; y_0 = 0;                      % Init xy-values
     s = 1;
      
     % Variables
@@ -12,8 +13,6 @@ for angle = initAngle : lastAngle
     y_i = 0; y_i1 = 0;
     B_i = 0; B_i1 = 0;
     K = 0;
-
-    x_0 = 1; y_0 = 0;                      % Init xy-values
 
     % Calculating precalculated constant K for n iterations
     for i = 0:n-1
@@ -44,19 +43,17 @@ for angle = initAngle : lastAngle
         elseif B_i1 < 0
             s = -1;
         end
-        disp(180*B_i1/pi);
     end
     
     % Multiplying with precalculated constant K
     cosine_theta =  K * x_i1;
     sine_theta = K * y_i1;
     
-    disp("x_0: " + x_0 + ", y_0: " + y_0);
-    disp("Angle: " + (B_0/pi)*180);
-    disp("Cosine: " + cos(B_0));
-    disp("Calculated: " + cosine_theta);
-    disp("Sine: " + sin(B_0));
-    disp("Calculated: " + sine_theta);
+    diffCosine = cos(B_0) - cosine_theta;
+    diffSine = sin(B_0) - sine_theta;
+    disp("Angle: " + 180*B_0/pi);
+    disp("Cosine: " + cos(B_0) + ", Calculated: " + cosine_theta + ", Difference: " + diffCosine);
+    disp("Sine: " + sin(B_0) + ", Calculated: " + sine_theta + ", Difference: " + diffSine);
     fprintf("\n");
 
     B_0 = B_0 + pi/180;
