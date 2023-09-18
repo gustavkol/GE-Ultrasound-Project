@@ -17,15 +17,15 @@ for angle = initAngle : lastAngle
 
     % Calculating precalculated constant K for n iterations
     for i = 0:n-1
-        if i == 1
+        if i == 0
             K = 1/sqrt(1+2^(-2*i));
         else
             K = K * 1/sqrt(1+2^(-2*i));
         end
     end
     
-    for i = 1:n
-        if i == 1
+    for i = 0:n-1
+        if i == 0
             B_i = B_0;
             x_i = x_0;
             y_i = y_0;
