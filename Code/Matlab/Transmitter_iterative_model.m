@@ -13,8 +13,8 @@ num_points  = 2^10;                 % Number of points on scanline
 scan_length = num_points*v/f_clk;   % Length of scanline
 n0_index    = 32;                   % Array index of element in origo
 
-% Variable input values
-R_0 = 50*p; angle_deg = 80;
+% Variable input value
+R_0 = 50*p; angle_deg = 90 + 30;
 
 % Calculating reference delays
 angle = angle_deg*pi/180;
@@ -23,10 +23,16 @@ b = x - R_0*cos(angle);
 R_n = sqrt(a.^2+b.^2);
 delay_reference = (f_clk*R_n/v);
 
-scanline_reference_delays = zeros(num_points);
-scanline_reference_delays(1) = (f_clk*R_0/v);
-for k = 2:num_points
-    scanline_reference_delays(k) = (f_clk*(R_0+k*delta_length)/v);
+a1 = zeros(noElements);
+b1 = zeros(noElements);
+R_n1 = zeros(noElements);
+delay_reference_scanline = zeros(num_points, noElements);
+
+for k = 1:num_points
+    a1 = (R_0+k*delta_length)*sin(angle);
+    b1 = x - (R_0+k*delta_length)*cos(angle);
+    R_n1 = sqrt(a1.^2+b1.^2);
+    delay_reference_scanline(k,:) = (f_clk*R_n1/v);
 end
 
 
@@ -38,8 +44,8 @@ cos_a = cordic(cordic_iter,angle_deg);
 % Step 3: Calculating delays in next point on scanline for all elements
 [scanline_delays_sq, scanline_delays] = delay_scanline(R_0, f_clk, v, n, p, cos_a, num_points, delay_sq);
 
-% PLOTTING RESULTS IN RESPECT TO REFERENCE %
-plot_results(n, delta_delay, delay, angle, R_0, scanline_delays, delta_length, num_points, n0_index, delay_reference, x, scanline_reference_delays);
+% Plotting result with respect to reference %
+plot_results(n, delay, angle, R_0, scanline_delays, delta_length, num_points, n0_index, delay_reference, x, delay_reference_scanline, 1);
 
 
 
@@ -48,20 +54,21 @@ plot_results(n, delta_delay, delay, angle, R_0, scanline_delays, delta_length, n
 % CORDIC algorithm
 function cos_a = cordic(iterations, angle_degrees)
     % Initializing values
-    B_0 = (angle_degrees/180)*pi;
     x_0 = 1; y_0 = 0;
+    K_n = 1;
+    if angle_degrees > 90
+        angle_degrees = 180 - angle_degrees;
+        K_n = -1;
+    end
+    B_0 = (angle_degrees/180)*pi;
     s = 1;
 
     % Defining variables
-    K_n = 0;
+
     
     % Calculating K_n, this will be precalculated in hardware memory
     for i = 0:iterations-1
-        if i == 0
-            K_n = 1/sqrt(1+2^(-2*i));
-        else
-            K_n = K_n * 1/sqrt(1+2^(-2*i));
-        end
+        K_n = K_n * 1/sqrt(1+2^(-2*i));
     end
 
     % Performing iterative calculation
@@ -142,7 +149,7 @@ function [delay_sq_array, delay_array] = delay_scanline(R_0, f_clk, v, n, p, cos
 end
 
 % Plotting function
-function plot_results(n, delta_delay, delay, angle, R_0, scanline_delays, delta_length, num_points, n0_index, delay_reference, x, scanline_reference_delays)
+function plot_results(n, delay, angle, R_0, scanline_delays, delta_length, num_points, n0_index, delay_reference, x, delay_reference_scanline, scanline_element_index)
     % Calculating difference between delay in origo and other elements
     for i = 1:length(n)
         delta_delay(i) = delay(i)-delay(n0_index);
@@ -173,11 +180,13 @@ function plot_results(n, delta_delay, delay, angle, R_0, scanline_delays, delta_
         end
         polarplot(theta1,rho1,'black');
     end
+    hold off;
     
+    % Plotting scanline delay for a given element
     figure(2);
     x_ax = R_0:delta_length:R_0+delta_length*(num_points-1);
-    plot(x_ax,scanline_delays(:,n0_index,:)); hold on
-    plot(x_ax,scanline_reference_delays); hold on
+    plot(x_ax,scanline_delays(:,scanline_element_index,:)); hold on
+    plot(x_ax,delay_reference_scanline(:,scanline_element_index,:)); hold on
     legend("Iterative", "Theoretical");
     title("Delay for element n=0 as focal points moves through scanline");
     hold off;
