@@ -37,12 +37,10 @@ end
 
 
 % SYSTEM FUNCTIONALITY %
-% Step 1: Using CORDIC to calculate approximation of cos(angle)
-cos_a = cordic(cordic_iter,angle_deg);
-% Step 2: Using iterative approach to calculate delays for each element for first point in scanline
-[delay_sq,delay] = delay_ref_point(f_clk, p, v, R_0, cos_a, n0_index);
-% Step 3: Calculating delays in next point on scanline for all elements
-[scanline_delays_sq, scanline_delays] = delay_scanline(R_0, f_clk, v, n, p, cos_a, num_points, delay_sq);
+% Step 1: Using iterative approach to calculate delays for each element for first point in scanline
+[delay_sq,delay] = delay_ref_point(f_clk, p, v, R_0, n0_index, angle_deg, cordic_iter);
+% Step 2: Calculating delays in next point on scanline for all elements
+[scanline_delays_sq, scanline_delays] = delay_scanline(R_0, f_clk, v, n, p, num_points, delay_sq, cordic_iter, angle_deg);
 
 % Plotting result with respect to reference %
 plot_results(n, delay, angle, R_0, scanline_delays, delta_length, num_points, n0_index, delay_reference, x, delay_reference_scanline, 1);
@@ -52,24 +50,20 @@ plot_results(n, delay, angle, R_0, scanline_delays, delta_length, num_points, n0
 % Functions
 
 % CORDIC algorithm
-function cos_a = cordic(iterations, angle_degrees)
+function cos_a = cordic(iterations, angle_degrees, x_scale)
     % Initializing values
-    x_0 = 1; y_0 = 0;
-    K_n = 1;
+    K_n = 1; sign_bit = 1;
     if angle_degrees > 90
         angle_degrees = 180 - angle_degrees;
-        K_n = -1;
+        sign_bit = -1; 
     end
-    B_0 = (angle_degrees/180)*pi;
-    s = 1;
-
-    % Defining variables
-
-    
     % Calculating K_n, this will be precalculated in hardware memory
     for i = 0:iterations-1
         K_n = K_n * 1/sqrt(1+2^(-2*i));
     end
+    x_0 = K_n*x_scale; y_0 = 0;
+    B_0 = (angle_degrees/180)*pi;
+    s = 1;
 
     % Performing iterative calculation
     for i = 0:iterations-1
@@ -94,14 +88,14 @@ function cos_a = cordic(iterations, angle_degrees)
         end
     end
 
-    cos_a = K_n * x_i1;
+    cos_a = sign_bit * x_i1;
 end
 
 % First scanpoint delays calculation
-function [delay_sq_list, delay_list] = delay_ref_point(f_clk, p, v, R_0, cos_a, n0_index)
+function [delay_sq_list, delay_list] = delay_ref_point(f_clk, p, v, R_0, n0_index, angle_deg, cordic_iter)
     % Pre-calculating constants for each scanline, to increase throughput in hardware
     A_0 = (f_clk*p/v)^2; 
-    C_0 = (f_clk/v)^2 * 2 * p * R_0 * cos_a;
+    C_0 = cordic(cordic_iter, angle_deg, (f_clk/v)^2 * 2 * p * R_0);
     
     % Calculating delay for reference transducer element in origo
     delay_sq(n0_index) = (f_clk/v)^2*R_0^2;
@@ -132,8 +126,8 @@ function [delay_sq_list, delay_list] = delay_ref_point(f_clk, p, v, R_0, cos_a, 
 end
 
 % Next scanpoints delay calculation
-function [delay_sq_array, delay_array] = delay_scanline(R_0, f_clk, v, n, p, cos_a, num_points,delay_sq)
-    B_n = 2 * R_0 * (f_clk/v) - 2 * n * p * (f_clk/v) * cos_a;
+function [delay_sq_array, delay_array] = delay_scanline(R_0, f_clk, v, n, p, num_points,delay_sq, cordic_iter, angle_deg)
+    B_n = 2 * R_0 * (f_clk/v) - cordic(cordic_iter, angle_deg, 2 * n * p * (f_clk/v));
     scanline_delays_sq = zeros(num_points, length(delay_sq));
     scanline_delays = zeros(num_points, length(delay_sq));
     
