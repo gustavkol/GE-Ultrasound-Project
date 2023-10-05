@@ -11,13 +11,13 @@ n           = -31:1:32;             % Element indexes
 x           = n*p;                  % x-pos of each element
 cordic_iter = 8;                    % Iterations used in CORDIC algorithm
 delta_length= v/f_s;                % Increment length for scanline
-num_points  = 2^8;                 % Number of points on scanline
+num_points  = 2^12;                 % Number of points on scanline
 scan_length = num_points*delta_length;% Length of scanline
 n0_index    = 32;                   % Array index of element in origo
 
 % Variable input values, used as reference point in scanline
-R_0 = 5*10^-3;%p*40;%50*p; 
-angle_deg = 45;
+R_0         = 5*10^-3;
+angle_deg   = 45;
 
 % Calculating reference delays
 angle = angle_deg*pi/180;
@@ -43,10 +43,10 @@ end
 % Step 1: Using iterative approach to calculate delays for each element for first point in scanline
 delay = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter);
 % Step 2: Calculating delays in next point on scanline for all elements
-scanline_delays = delay_scanline(R_0, f_s, v, n, p, num_points, delay, cordic_iter, angle_deg);
+scanline_delays = delay_scanline(R_0, f_s, v, n, p, num_points, delay, cordic_iter, angle_deg) + 1;
 
 % Plotting result with respect to reference %
-plot_results(n, delay, angle, R_0, scanline_delays, delta_length, num_points, n0_index, delay_reference, x, delay_reference_scanline, 1);
+plot_results(n, delay, angle, R_0, scanline_delays, delta_length, num_points, n0_index, delay_reference, x, delay_reference_scanline, 64);
 
 
 
@@ -100,6 +100,7 @@ function delay_list = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordi
     % Pre-calculating constants for each scanline, to increase throughput in hardware
     A_0 = (f_s*p/v)^2; 
     C_0 = cordic(cordic_iter, angle_deg, (f_s/v)^2 * 2 * p * R_0);
+    error_corr = 30;
     
     % Calculating delay for reference transducer element in origo
     delay(n0_index) = (f_s/v)*R_0;
@@ -109,13 +110,13 @@ function delay_list = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordi
     for i = 1:32
         cur_index = n0_index + i;
         inc_term = A_0*(2*i+1) - C_0;
-        [delay(cur_index),error_prev] = increment_and_compare(delay(cur_index-1), error_prev, inc_term, -33);
+        [delay(cur_index),error_prev] = increment_and_compare(delay(cur_index-1), error_prev, inc_term, -error_corr);
     end
     error_prev = 0;
     for i = 1:31
         cur_index = n0_index - i;
         inc_term = A_0*(2*i+1) + C_0;
-        [delay(cur_index),error_prev] = increment_and_compare(delay(cur_index+1), error_prev, inc_term, -33);
+        [delay(cur_index),error_prev] = increment_and_compare(delay(cur_index+1), error_prev, inc_term, -error_corr);
     end
 
     delay_list = delay;
@@ -140,11 +141,6 @@ function [N_next,error_next] = increment_and_compare(N_prev, error_prev, inc_ter
             break;
         end
     end
-    %disp("Inc term: " + inc_term);
-    %disp("Inc term with error: " + inc_term_w_error);
-    %disp("Subtract: " + (2*a*N_prev+a^2) + " (a = " + a + ")");
-    %disp("Error: " + cur_error);
-    %disp(a);
     
     N_next = N_prev + a;
     error_next = cur_error;
@@ -152,8 +148,12 @@ end
 
 % Next scanpoints delay calculation
 function delay_array = delay_scanline(R_0, f_s, v, n, p, num_points,delay, cordic_iter, angle_deg)
-    B_n = 2 * R_0 * (f_s/v) - cordic(cordic_iter, angle_deg, 2 * n * p * (f_s/v));
-    error_corr = 2-cordic(cordic_iter, angle_deg, 2 * p * (f_s/v));
+    % Precalculated CORDIC constants, input except angle stored in memory
+    B_cordic = cordic(cordic_iter, angle_deg, 2 * n * p * (f_s/v));
+    
+    % Precalculated constants
+    B_n = 2 * R_0 * (f_s/v) - B_cordic;
+    error_corr = 2;
     
     scanline_delays = zeros(num_points, length(delay));
     error_prev = zeros(length(delay));
@@ -161,7 +161,6 @@ function delay_array = delay_scanline(R_0, f_s, v, n, p, num_points,delay, cordi
     scanline_delays(1,:) = delay;
     for k = 2:num_points
         inc_terms = 2*k + 1 + B_n;
-        disp(error_corr);
         [scanline_delays(k,:),error_prev] = increment_and_compare_array(scanline_delays(k-1,:), error_prev, inc_terms, -error_corr);
     end
 
@@ -220,22 +219,20 @@ function plot_results(n, delay, angle, R_0, scanline_delays, delta_length, num_p
     plot(x_ax,scanline_delays(:,scanline_element_index,:)); hold on
     plot(x_ax,delay_reference_scanline(:,scanline_element_index,:)); hold on
     xlabel("Distance travelled on scanline");
-    ylabel("Delay in system clock cycles");
+    ylabel("Delay in sample frequency cycles");
     legend("Iterative approach", "Theoretical reference");
     title(sprintf("Delay for element n=%d as focal points moves through scanline", scanline_element_index-32));
     hold off;
 
     % Plotting delta delay between each element as a function of
-    % R_0+delta_length*k
     figure(3);
     for k = 1:1:num_points
         delta_scanline_delays = scanline_delays(k,:,1) - scanline_delays(k,32,1);
-
         plot(-32:1:31,delta_scanline_delays(:,:)); hold on;
     end
     title("Delta delay profile for elements");
     xlabel("Element index");
-    ylabel("Delay in sample frequency cycles");
+    ylabel("Delta delay in sample frequency cycles");
     subtitle(sprintf(" R_n = [%d mm,%.1d mm] and angle = %.0d", R_0*10^3, R_0*10^3 + 10^3*num_points * delta_length, angle*180/pi));
     hold off;
 end

@@ -16,7 +16,7 @@ scan_length = num_points*delta_length;     % Length of scanline
 n0_index    = 32;                   % Array index of element in origo
 
 % Variable input values, used as reference point in scanline
-R_0 = 1*10^-3;%p*40;%50*p; 
+R_0 = 5*10^-3;%p*40;%50*p; 
 angle_deg = 45;
 
 % Calculating reference delays
@@ -167,7 +167,7 @@ function plot_results(n, delay, angle, R_0, scanline_delays, delta_length, num_p
     
     % Plotting illustration of delay for each element at first point of
     % scanline, error plotted in black
-    delay_gain = R_0*0.003;
+    delay_gain = R_0*0.01;
     for i = 1:length(n)-1
         [theta,rho] = cart2pol([x(i),x(i)],[0,delay_gain*delta_delay(i)]); 
         if delta_delay(i) >= 0
