@@ -14,8 +14,8 @@ scan_length = num_points*delta_length;% Length of scanline
 n0_index    = 32;                   % Array index of element in origo
 
 % Variable input values, used as reference point in scanline
-R_0         = 5*10^-3;
-angle_deg   = 90-41;
+R_0         = 100*10^-3;
+angle_deg   = 90+41;
 
 % Calculating reference delays
 angle = angle_deg*pi/180;
@@ -133,7 +133,7 @@ function [N_next,error_next, a_next] = increment_and_compare(N_prev, error_prev,
     inc_term_w_error = inc_term + error_prev;
 
     % Propagate previous a to get an initial guess for a (a = a_prev +/- 1)
-    a = a_prev - sign_bit;      % TODO: Should be optimized to reduce iterations
+    a = a_prev - sign_bit;      % TODO: Should be optimized to reduce iterations and not cause errors for some inputs
     %a = 0;                     % Overrides initial guess
     cur_error = 0;
     max_i = 0;
