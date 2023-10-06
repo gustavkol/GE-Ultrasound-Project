@@ -1,5 +1,3 @@
- % TODO: Find and implement a way to do square root in hardware
-
 % Static memory parameters %
 noElements  = 64;                   % Number of transducer elements
 p           = 250 * 10^-6;          % Pitch length
@@ -9,7 +7,7 @@ f_clk       = 100 * 10^6;           % Clock frequency
 v           = 1540;                 % Speed of sound
 n           = -31:1:32;             % Element indexes
 x           = n*p;                  % x-pos of each element
-cordic_iter = 8;                    % Iterations used in CORDIC algorithm
+cordic_iter = 12;                    % Iterations used in CORDIC algorithm
 delta_length= v/f_s;                % Increment length for scanline
 num_points  = 2^12;                 % Number of points on scanline
 scan_length = num_points*delta_length;% Length of scanline
@@ -17,7 +15,7 @@ n0_index    = 32;                   % Array index of element in origo
 
 % Variable input values, used as reference point in scanline
 R_0         = 5*10^-3;
-angle_deg   = 45;
+angle_deg   = 90-41;
 
 % Calculating reference delays
 angle = angle_deg*pi/180;
@@ -43,7 +41,7 @@ end
 % Step 1: Using iterative approach to calculate delays for each element for first point in scanline
 delay = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter);
 % Step 2: Calculating delays in next point on scanline for all elements
-scanline_delays = delay_scanline(R_0, f_s, v, n, p, num_points, delay, cordic_iter, angle_deg) + 1;
+scanline_delays = delay_scanline(R_0, f_s, v, n, p, num_points, delay, cordic_iter, angle_deg) + 0.2;
 
 % Plotting result with respect to reference %
 plot_results(n, delay, angle, R_0, scanline_delays, delta_length, num_points, n0_index, delay_reference, x, delay_reference_scanline, 64);
@@ -100,30 +98,33 @@ function delay_list = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordi
     % Pre-calculating constants for each scanline, to increase throughput in hardware
     A_0 = (f_s*p/v)^2; 
     C_0 = cordic(cordic_iter, angle_deg, (f_s/v)^2 * 2 * p * R_0);
-    error_corr = 30;
+    error_corr = 35;
     
     % Calculating delay for reference transducer element in origo
     delay(n0_index) = (f_s/v)*R_0;
     
     % Iteratively calculating delay for all elements for first scan point
-    error_prev = 0;
+    error_prev = 0; a_prev = 0;
     for i = 1:32
         cur_index = n0_index + i;
         inc_term = A_0*(2*i+1) - C_0;
-        [delay(cur_index),error_prev] = increment_and_compare(delay(cur_index-1), error_prev, inc_term, -error_corr);
+        [delay(cur_index),error_prev, a_prev] = increment_and_compare(delay(cur_index-1), error_prev, inc_term, -error_corr, a_prev);
     end
     error_prev = 0;
     for i = 1:31
         cur_index = n0_index - i;
         inc_term = A_0*(2*i+1) + C_0;
-        [delay(cur_index),error_prev] = increment_and_compare(delay(cur_index+1), error_prev, inc_term, -error_corr);
+        [delay(cur_index),error_prev, a_prev] = increment_and_compare(delay(cur_index+1), error_prev, inc_term, -error_corr, a_prev);
     end
 
     delay_list = delay;
 end
 
 % Increment and compare block for initial point on scanline (replaces square root)
-function [N_next,error_next] = increment_and_compare(N_prev, error_prev, inc_term, correction)
+function [N_next,error_next, a_next] = increment_and_compare(N_prev, error_prev, inc_term, correction, a_prev)
+    % Increment step for a, mirrors approximal maximal error to N_n+1
+    inc_step = 1/2;
+
     if inc_term >= 0
         sign_bit = 1;
     else
@@ -131,19 +132,38 @@ function [N_next,error_next] = increment_and_compare(N_prev, error_prev, inc_ter
     end
     inc_term_w_error = inc_term + error_prev;
 
-    a = 0;
+    % Propagate previous a to get an initial guess for a (a = a_prev +/- 1)
+    a = a_prev - sign_bit;      % TODO: Should be optimized to reduce iterations
+    %a = 0;                     % Overrides initial guess
     cur_error = 0;
-    for i = 1:5
-        a = sign_bit*i;
-        if abs(2*a*N_prev+a^2) > abs(inc_term_w_error)
-            a = a - sign_bit;
-            cur_error = inc_term_w_error - (2*a*N_prev + a^2) + correction;  % Last part a correction because inc_term changes for each iteration, relationship with error not constant
-            break;
+    max_i = 0;
+    for i = 1:5/inc_step
+        a = a + sign_bit*inc_step;
+        if sign_bit == -1
+            if 2*a*N_prev+a^2 < inc_term_w_error
+                a = a - sign_bit*inc_step;
+                cur_error = inc_term_w_error - (2*a*N_prev + a^2) + correction;  % Last part a correction because inc_term changes for each iteration, relationship with error not constant
+                if i > max_i
+                    max_i = i;
+                end
+                break;
+            end
+        elseif sign_bit == 1
+            if 2*a*N_prev+a^2 > inc_term_w_error
+                a = a - sign_bit*inc_step;
+                cur_error = inc_term_w_error - (2*a*N_prev + a^2) + correction;  % Last part a correction because inc_term changes for each iteration, relationship with error not constant
+                if i > max_i
+                    max_i = i;
+                end
+                break;
+            end
         end
     end
+    %disp(max_i);
     
     N_next = N_prev + a;
     error_next = cur_error;
+    a_next = a;
 end
 
 % Next scanpoints delay calculation
@@ -157,22 +177,23 @@ function delay_array = delay_scanline(R_0, f_s, v, n, p, num_points,delay, cordi
     
     scanline_delays = zeros(num_points, length(delay));
     error_prev = zeros(length(delay));
+    a_prev = zeros(length(delay));
     
     scanline_delays(1,:) = delay;
     for k = 2:num_points
         inc_terms = 2*k + 1 + B_n;
-        [scanline_delays(k,:),error_prev] = increment_and_compare_array(scanline_delays(k-1,:), error_prev, inc_terms, -error_corr);
+        [scanline_delays(k,:),error_prev, a_prev] = increment_and_compare_array(scanline_delays(k-1,:), error_prev, inc_terms, -error_corr, a_prev);
     end
 
     delay_array = scanline_delays;
 end
 
 % Increment and compare array block, for next point in scanline (replaces square root)
-function [N_next_array,error_next_array] = increment_and_compare_array(N_prev_array, error_prev_array, inc_terms_array, error_corr)
+function [N_next_array,error_next_array, a_prev] = increment_and_compare_array(N_prev_array, error_prev_array, inc_terms_array, error_corr, a_prev)
     N_next_array_cur = zeros(length(N_prev_array));
     error_next_array_cur = zeros(length(N_prev_array));
     for i = 1:length(N_prev_array)
-        [N_next_array_cur(i),error_next_array_cur(i)] = increment_and_compare(N_prev_array(i), error_prev_array(i), inc_terms_array(i), error_corr);
+        [N_next_array_cur(i),error_next_array_cur(i),a_prev(i)] = increment_and_compare(N_prev_array(i), error_prev_array(i), inc_terms_array(i), error_corr, a_prev(i));
     end
     N_next_array = N_next_array_cur(1:length(N_prev_array));
     error_next_array = error_next_array_cur(1:length(N_prev_array));
