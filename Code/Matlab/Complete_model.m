@@ -14,8 +14,8 @@ scan_length = num_points*delta_length;% Length of scanline
 n0_index    = 32;                   % Array index of element in origo
 
 % Variable input values, used as reference point in scanline
-R_0         = 100*10^-3;
-angle_deg   = 90+41;
+R_0         = 1*10^-3;
+angle_deg   = 90-45;
 
 % Calculating reference delays
 angle = angle_deg*pi/180;
@@ -41,64 +41,21 @@ end
 % Step 1: Using iterative approach to calculate delays for each element for first point in scanline
 delay = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter);
 % Step 2: Calculating delays in next point on scanline for all elements
-scanline_delays = delay_scanline(R_0, f_s, v, n, p, num_points, delay, cordic_iter, angle_deg) + 0.2;
+scanline_delays = delay_scanline(R_0, f_s, v, n, p, num_points, delay, cordic_iter, angle_deg) + 0.0;
 
 % Plotting result with respect to reference %
-plot_results(n, delay, angle, R_0, scanline_delays, delta_length, num_points, n0_index, delay_reference, x, delay_reference_scanline, 64);
+plot_results(n, delay, angle, R_0, scanline_delays, delta_length, num_points, n0_index, delay_reference, x, delay_reference_scanline, 32+8);
 
 
 
 % Functions
-
-% CORDIC algorithm
-function cos_a = cordic(iterations, angle_degrees, x_scale)
-    % Initializing values
-    K_n = 1; sign_bit = 1;
-    if angle_degrees > 90
-        angle_degrees = 180 - angle_degrees;
-        sign_bit = -1; 
-    end
-    
-    % Calculating K_n, this will be a constant precalculated in hardware memory
-    for i = 0:iterations-1
-        K_n = K_n * 1/sqrt(1+2^(-2*i));
-    end
-    x_0 = K_n*x_scale; y_0 = 0;
-    B_0 = (angle_degrees/180)*pi;
-    s = 1;
-
-    % Performing iterative calculation
-    for i = 0:iterations-1
-        if i == 0
-            B_i = B_0;
-            x_i = x_0;
-            y_i = y_0;
-        else
-            B_i = B_i1;
-            x_i = x_i1;
-            y_i = y_i1;
-        end
-    
-        x_i1 = x_i - s * y_i * 2^(-i);
-        y_i1 = s * x_i * 2^(-i) + y_i;
-        B_i1 = B_i - s * atan(2^(-i));
-
-        if B_i1 > 0
-            s = 1;
-        elseif B_i1 < 0
-            s = -1;
-        end
-    end
-
-    cos_a = sign_bit * x_i1;
-end
 
 % First scanpoint delays calculation
 function delay_list = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter)
     % Pre-calculating constants for each scanline, to increase throughput in hardware
     A_0 = (f_s*p/v)^2; 
     C_0 = cordic(cordic_iter, angle_deg, (f_s/v)^2 * 2 * p * R_0);
-    error_corr = 35;
+    error_corr = 0;%32.94;
     
     % Calculating delay for reference transducer element in origo
     delay(n0_index) = (f_s/v)*R_0;
@@ -107,13 +64,13 @@ function delay_list = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordi
     error_prev = 0; a_prev = 0;
     for i = 1:32
         cur_index = n0_index + i;
-        inc_term = A_0*(2*i+1) - C_0;
+        inc_term = A_0*(2*(i-1)+1) - C_0;
         [delay(cur_index),error_prev, a_prev] = increment_and_compare(delay(cur_index-1), error_prev, inc_term, -error_corr, a_prev);
     end
-    error_prev = 0;
+    error_prev = 0; a_prev = 0;
     for i = 1:31
         cur_index = n0_index - i;
-        inc_term = A_0*(2*i+1) + C_0;
+        inc_term = A_0*(2*(i-1)+1) + C_0;
         [delay(cur_index),error_prev, a_prev] = increment_and_compare(delay(cur_index+1), error_prev, inc_term, -error_corr, a_prev);
     end
 
@@ -123,7 +80,7 @@ end
 % Increment and compare block for initial point on scanline (replaces square root)
 function [N_next,error_next, a_next] = increment_and_compare(N_prev, error_prev, inc_term, correction, a_prev)
     % Increment step for a, mirrors approximal maximal error to N_n+1
-    inc_step = 1/2;
+    inc_step = 1/4;
 
     if inc_term >= 0
         sign_bit = 1;
@@ -132,34 +89,28 @@ function [N_next,error_next, a_next] = increment_and_compare(N_prev, error_prev,
     end
     inc_term_w_error = inc_term + error_prev;
 
-    % Propagate previous a to get an initial guess for a (a = a_prev +/- 1)
-    a = a_prev - sign_bit;      % TODO: Should be optimized to reduce iterations and not cause errors for some inputs
-    %a = 0;                     % Overrides initial guess
+    % Propagate previous a to get an initial guess for a
+    %a = a_prev - sign_bit * inc_step * 2;           % TODO: Should be optimized to reduce iterations and not cause errors for some inputs
+    a = 0;                                         % Overrides initial guess
+
     cur_error = 0;
-    max_i = 0;
-    for i = 1:5/inc_step
+    for i = 1:100 %5/inc_step
         a = a + sign_bit*inc_step;
         if sign_bit == -1
             if 2*a*N_prev+a^2 < inc_term_w_error
                 a = a - sign_bit*inc_step;
                 cur_error = inc_term_w_error - (2*a*N_prev + a^2) + correction;  % Last part a correction because inc_term changes for each iteration, relationship with error not constant
-                if i > max_i
-                    max_i = i;
-                end
                 break;
             end
         elseif sign_bit == 1
             if 2*a*N_prev+a^2 > inc_term_w_error
                 a = a - sign_bit*inc_step;
                 cur_error = inc_term_w_error - (2*a*N_prev + a^2) + correction;  % Last part a correction because inc_term changes for each iteration, relationship with error not constant
-                if i > max_i
-                    max_i = i;
-                end
                 break;
             end
         end
     end
-    %disp(max_i);
+    %disp(i);
     
     N_next = N_prev + a;
     error_next = cur_error;
@@ -173,7 +124,7 @@ function delay_array = delay_scanline(R_0, f_s, v, n, p, num_points,delay, cordi
     
     % Precalculated constants
     B_n = 2 * R_0 * (f_s/v) - B_cordic;
-    error_corr = 2;
+    error_corr = 0;%2;
     
     scanline_delays = zeros(num_points, length(delay));
     error_prev = zeros(length(delay));
@@ -181,7 +132,7 @@ function delay_array = delay_scanline(R_0, f_s, v, n, p, num_points,delay, cordi
     
     scanline_delays(1,:) = delay;
     for k = 2:num_points
-        inc_terms = 2*k + 1 + B_n;
+        inc_terms = 2*(k-1) + 1 + B_n;
         [scanline_delays(k,:),error_prev, a_prev] = increment_and_compare_array(scanline_delays(k-1,:), error_prev, inc_terms, -error_corr, a_prev);
     end
 
