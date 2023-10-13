@@ -28,12 +28,13 @@ a1 = zeros(noElements);
 b1 = zeros(noElements);
 R_n1 = zeros(noElements);
 delay_reference_scanline = zeros(num_points, noElements);
+delay_reference_scanline(1,:) = delay_reference;
 
-for k = 1:num_points
+for k = 1:num_points-1
     a1 = (R_0+k*delta_length)*sin(angle);
     b1 = x - (R_0+k*delta_length)*cos(angle);
     R_n1 = sqrt(a1.^2+b1.^2);
-    delay_reference_scanline(k,:) = (f_s*R_n1/v);
+    delay_reference_scanline(k+1,:) = (f_s*R_n1/v);
 end
 
 
@@ -61,37 +62,36 @@ function delay_list = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordi
     delay(n0_index) = (f_s/v)*R_0;
     
     % Iteratively calculating delay for all elements for first scan point
-    error_prev = 0; a_prev = 0;
+    error_prev = 0; a_prev = 0; inc_term_prev = 0;
     for i = 1:32
         cur_index = n0_index + i;
         inc_term = A_0*(2*(i-1)+1) - C_0;
-        [delay(cur_index),error_prev, a_prev] = increment_and_compare(delay(cur_index-1), error_prev, inc_term, -error_corr, a_prev);
+        [delay(cur_index),error_prev, a_prev, inc_term_prev] = increment_and_compare(delay(cur_index-1), error_prev, inc_term, -error_corr, a_prev, inc_term_prev);
     end
-    error_prev = 0; a_prev = 0;
+    error_prev = 0; a_prev = 0; inc_term_prev = 0;
     for i = 1:31
         cur_index = n0_index - i;
         inc_term = A_0*(2*(i-1)+1) + C_0;
-        [delay(cur_index),error_prev, a_prev] = increment_and_compare(delay(cur_index+1), error_prev, inc_term, -error_corr, a_prev);
+        [delay(cur_index),error_prev, a_prev, inc_term_prev] = increment_and_compare(delay(cur_index+1), error_prev, inc_term, -error_corr, a_prev, inc_term_prev);
     end
 
     delay_list = delay;
 end
 
 % Increment and compare block for initial point on scanline (replaces square root)
-function [N_next,error_next, a_next] = increment_and_compare(N_prev, error_prev, inc_term, correction, a_prev)
+function [N_next,error_next, a_next, inc_term_next] = increment_and_compare(N_prev, error_prev, inc_term, correction, a_prev, inc_term_prev)
     % Increment step for a, mirrors approximal maximal error to N_n+1
     inc_step = 1/4;
-
-    if inc_term >= 0
+    
+    inc_term_w_error = inc_term + error_prev;
+    if inc_term_w_error >= inc_term_prev
         sign_bit = 1;
     else
         sign_bit = -1;
     end
-    inc_term_w_error = inc_term + error_prev;
 
     % Propagate previous a to get an initial guess for a
-    %a = a_prev - sign_bit * inc_step * 2;           % TODO: Should be optimized to reduce iterations and not cause errors for some inputs
-    a = 0;                                         % Overrides initial guess
+    a = a_prev;
 
     cur_error = 0;
     for i = 1:100 %5/inc_step
@@ -109,12 +109,12 @@ function [N_next,error_next, a_next] = increment_and_compare(N_prev, error_prev,
                 break;
             end
         end
+        %a = a + sign_bit*inc_step;
     end
-    %disp(i);
-    
     N_next = N_prev + a;
     error_next = cur_error;
     a_next = a;
+    inc_term_next = 2*a*N_prev+a^2;
 end
 
 % Next scanpoints delay calculation
@@ -124,30 +124,39 @@ function delay_array = delay_scanline(R_0, f_s, v, n, p, num_points,delay, cordi
     
     % Precalculated constants
     B_n = 2 * R_0 * (f_s/v) - B_cordic;
-    error_corr = 0;%2;
+    error_corr = 2;
     
     scanline_delays = zeros(num_points, length(delay));
     error_prev = zeros(length(delay));
     a_prev = zeros(length(delay));
+    inc_term_prev = zeros(length(delay));
     
     scanline_delays(1,:) = delay;
     for k = 2:num_points
         inc_terms = 2*(k-1) + 1 + B_n;
-        [scanline_delays(k,:),error_prev, a_prev] = increment_and_compare_array(scanline_delays(k-1,:), error_prev, inc_terms, -error_corr, a_prev);
+        %inc_term_prev = 2*(k-2) + 1 + B_n;
+        [scanline_delays(k,:),error_prev, a_prev, inc_term_prev] = increment_and_compare_array(scanline_delays(k-1,:), error_prev, inc_terms, -error_corr, a_prev, inc_term_prev);
     end
 
     delay_array = scanline_delays;
 end
 
 % Increment and compare array block, for next point in scanline (replaces square root)
-function [N_next_array,error_next_array, a_prev] = increment_and_compare_array(N_prev_array, error_prev_array, inc_terms_array, error_corr, a_prev)
+function [N_next_array,error_next_array, a_next_array, inc_term_next_array] = increment_and_compare_array(N_prev_array, error_prev_array, inc_terms_array, error_corr, a_prev, inc_term_prev)
     N_next_array_cur = zeros(length(N_prev_array));
     error_next_array_cur = zeros(length(N_prev_array));
+    inc_term_next_array_cur = zeros(length(N_prev_array));
+    a_next_array_cur = zeros(length(N_prev_array));
+
     for i = 1:length(N_prev_array)
-        [N_next_array_cur(i),error_next_array_cur(i),a_prev(i)] = increment_and_compare(N_prev_array(i), error_prev_array(i), inc_terms_array(i), error_corr, a_prev(i));
+        [N_next_array_cur(i),error_next_array_cur(i),a_next_array_cur(i), inc_term_next_array_cur(i)] = increment_and_compare(N_prev_array(i), error_prev_array(i), inc_terms_array(i), error_corr, a_prev(i), inc_term_prev(i));
     end
+
     N_next_array = N_next_array_cur(1:length(N_prev_array));
     error_next_array = error_next_array_cur(1:length(N_prev_array));
+    a_next_array = a_next_array_cur(1:length(N_prev_array));
+    inc_term_next_array = inc_term_next_array_cur(1:length(N_prev_array));
+
 end
 
 % Plotting function
