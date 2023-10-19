@@ -42,19 +42,19 @@ end
 
 % SYSTEM FUNCTIONALITY %
 % Step 1: Using iterative approach to calculate delays for each element for first point in scanline
-delay = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter, inc_step);
+[delay,error_list_ref] = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter, inc_step);
 % Step 2: Calculating delays in next point on scanline for all elements
-scanline_delays = delay_scanline(R_0, f_s, v, n, p, num_points, delay, cordic_iter, angle_deg, inc_step);
+scanline_delays = delay_scanline(R_0, f_s, v, n, p, num_points, delay, cordic_iter, angle_deg, inc_step, error_list_ref);
 
 % Plotting result with respect to reference %
-plot_results(n, delay, angle, R_0, scanline_delays, delta_length, num_points, n0_index, delay_reference, x, delay_reference_scanline, 32+16);
+plot_results(n, delay, angle, R_0, scanline_delays, delta_length, num_points, n0_index, delay_reference, x, delay_reference_scanline, 32+17);
 
 
 
 % Functions
 
 % First scanpoint delays calculation
-function delay_list = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter, inc_step)
+function [delay_list,error_list_ref] = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter, inc_step)
     % Pre-calculating constants for each scanline, to increase throughput in hardware
     A_0 = (f_s*p/v)^2; 
     C_0 = cordic(cordic_iter, angle_deg, (f_s/v)^2 * 2 * p * R_0);
@@ -63,20 +63,22 @@ function delay_list = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordi
     delay(n0_index) = (f_s/v)*R_0;
     
     % Iteratively calculating delay for all elements for first scan point
-    error_prev = 0; a_prev = 0; inc_term_prev = 0;
+    error_prev_list = zeros(64);
+    a_prev = 0; inc_term_prev = 0;
     for i = 1:32
         cur_index = n0_index + i;
         inc_term = A_0*(2*(i-1)+1) - C_0;
-        [delay(cur_index),error_prev, a_prev, inc_term_prev] = increment_and_compare(delay(cur_index-1), error_prev, inc_term, a_prev, inc_term_prev, inc_step);
+        [delay(cur_index),error_prev_list(cur_index), a_prev, inc_term_prev] = increment_and_compare(delay(cur_index-1), error_prev_list(cur_index-1), inc_term, a_prev, inc_term_prev, inc_step);
     end
-    error_prev = 0; a_prev = 0; inc_term_prev = 0;
+    a_prev = 0; inc_term_prev = 0;
     for i = 1:31
         cur_index = n0_index - i;
         inc_term = A_0*(2*(i-1)+1) + C_0;
-        [delay(cur_index),error_prev, a_prev, inc_term_prev] = increment_and_compare(delay(cur_index+1), error_prev, inc_term, a_prev, inc_term_prev, inc_step);
+        [delay(cur_index),error_prev_list(cur_index), a_prev, inc_term_prev] = increment_and_compare(delay(cur_index+1), error_prev_list(cur_index+1), inc_term, a_prev, inc_term_prev, inc_step);
     end
 
     delay_list = delay;
+    error_list_ref = error_prev_list;
 end
 
 % Increment and compare block for initial point on scanline (replaces square root)
@@ -119,7 +121,7 @@ function [N_next,error_next, a_next, inc_term_next] = increment_and_compare(N_pr
 end
 
 % Next scanpoints delay calculation
-function delay_array = delay_scanline(R_0, f_s, v, n, p, num_points,delay, cordic_iter, angle_deg, inc_step)
+function delay_array = delay_scanline(R_0, f_s, v, n, p, num_points,delay, cordic_iter, angle_deg, inc_step, error_list_ref)
     % Precalculated CORDIC constants, input except angle stored in memory
     B_cordic = cordic(cordic_iter, angle_deg, 2 * n * p * (f_s/v));
     
@@ -127,7 +129,7 @@ function delay_array = delay_scanline(R_0, f_s, v, n, p, num_points,delay, cordi
     B_n = 2 * R_0 * (f_s/v) - B_cordic;
     
     scanline_delays = zeros(num_points, length(delay));
-    error_prev = zeros(length(delay));
+    error_prev = error_list_ref;
     a_prev = zeros(length(delay));
     inc_term_prev = zeros(length(delay));
     
