@@ -45,11 +45,11 @@ for R_0 = 1*10^-3:10^-3:255*10^-3
 
         % SYSTEM FUNCTIONALITY %
         % Step 1: Using iterative approach to calculate delays for each element for first point in scanline
-        [delay,iter_count] = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter, inc_step);
+        [delay,iter_count,a_list_ref,error_list_ref] = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter, inc_step);
         disp("R_0: " + R_0 + ", angle: " + angle_deg)
         disp("Iterations (clock cycles) needed for reference point delay calculations: " + iter_count);
         % Step 2: Calculating delays in next point on scanline for all elements
-        scanline_delays = delay_scanline(R_0, f_s, v, n, p, num_points, delay, cordic_iter, angle_deg, inc_step);
+        scanline_delays = delay_scanline(R_0, f_s, v, n, p, num_points, delay, cordic_iter, angle_deg, inc_step,a_list_ref, error_list_ref);
 
         % Sweeping scanline %
         [max_error_neg(iter), max_error_pos(iter)] = sweep_scanline(R_0, angle, scanline_delays, num_points, delay_reference_scanline, max_error_neg(iter), max_error_pos(iter), 0);
@@ -70,7 +70,7 @@ xlabel("R_0 (mm)")
 
 %Looking at some interesting R_0 values
 figure(2);
-R_0_list = [10^-3, 129*10^-3, 242*10^-3];
+R_0_list = [10^-3,2*10^-3, 129*10^-3, 242*10^-3];
 max_error_angle = zeros(46);
 for i = 1:length(R_0_list)
     iter = 0;
@@ -101,11 +101,11 @@ for i = 1:length(R_0_list)
 
         % SYSTEM FUNCTIONALITY %
         % Step 1: Using iterative approach to calculate delays for each element for first point in scanline
-        [delay,iter_count] = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter, inc_step);
+        [delay,iter_count,a_list_ref,error_list_ref] = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter, inc_step);
         disp("R_0: " + R_0 + ", angle: " + angle_deg)
         disp("Iterations (clock cycles) needed for reference point delay calculations: " + iter_count);
         % Step 2: Calculating delays in next point on scanline for all elements
-        scanline_delays = delay_scanline(R_0, f_s, v, n, p, num_points, delay, cordic_iter, angle_deg, inc_step);
+        scanline_delays = delay_scanline(R_0, f_s, v, n, p, num_points, delay, cordic_iter, angle_deg, inc_step,a_list_ref, error_list_ref);
 
         % Sweeping scanline %
         [discard,max_error_angle(iter)] = sweep_scanline(R_0, angle, scanline_delays, num_points, delay_reference_scanline, 0, 0, 0);
@@ -113,14 +113,14 @@ for i = 1:length(R_0_list)
     end
     plot(45:90, max_error_angle(1:46)); hold on;
 end
-legend("R_0 = " + R_0_list(1),"R_0 = " + R_0_list(2), "R_0 = " + R_0_list(3));
+legend("R_0 = " + R_0_list(1),"R_0 = " + R_0_list(2), "R_0 = " + R_0_list(3), "R_0 = " + R_0_list(4));
 ylabel("Error in sample frequency cycles/periods")
 xlabel("Angle (degrees)")
 title("Maximal positive delay error in scanline with regards to angle")
 hold off;
 
 %% 
-R_0_list = [10^-3, 10*10^-3, 20*10^-3, 30*10^-3, 129*10^-3, 242*10^-3];
+R_0_list = [10^-3, 2*10^-3, 10*10^-3, 20*10^-3, 30*10^-3, 129*10^-3, 242*10^-3];
 for i = 1:length(R_0_list)
     iter = 0;
     R_0 = R_0_list(i);
@@ -149,11 +149,11 @@ for i = 1:length(R_0_list)
     
     % SYSTEM FUNCTIONALITY %
     % Step 1: Using iterative approach to calculate delays for each element for first point in scanline
-    [delay,iter_count] = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter, inc_step);
+    [delay,iter_count,a_list_ref,error_list_ref] = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter, inc_step);
     disp("R_0: " + R_0 + ", angle: " + angle_deg)
     disp("Iterations (clock cycles) needed for reference point delay calculations: " + iter_count);
     % Step 2: Calculating delays in next point on scanline for all elements
-    scanline_delays = delay_scanline(R_0, f_s, v, n, p, num_points, delay, cordic_iter, angle_deg, inc_step);
+    scanline_delays = delay_scanline(R_0, f_s, v, n, p, num_points, delay, cordic_iter, angle_deg, inc_step,a_list_ref, error_list_ref);
     
     % Sweeping scanline %
     figure(3+i);
@@ -164,7 +164,7 @@ end
 % Functions
 
 % First scanpoint delays calculation
-function [delay_list,iter_count] = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter, inc_step)
+function [delay_list,iter_count,a_list_ref,error_list_ref] = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter, inc_step)
     % Pre-calculating constants for each scanline, to increase throughput in hardware
     A_0 = (f_s*p/v)^2; 
     C_0 = cordic(cordic_iter, angle_deg, (f_s/v)^2 * 2 * p * R_0);
@@ -174,17 +174,17 @@ function [delay_list,iter_count] = delay_ref_point(f_s, p, v, R_0, n0_index, ang
     delay(n0_index) = (f_s/v)*R_0;
     
     % Iteratively calculating delay for all elements for first scan point
-    error_prev = 0; a_prev = 0; inc_term_prev = 0; iter_count_pos = 0;
+    error_prev_list = zeros(64); a_prev_list = zeros(64); inc_term_prev = 0; iter_count_pos = 0;
     for i = 1:32
         cur_index = n0_index + i;
         inc_term = A_0*(2*(i-1)+1) - C_0;
-        [delay(cur_index),error_prev, a_prev, inc_term_prev, iter_count_pos] = increment_and_compare(delay(cur_index-1), error_prev, inc_term, a_prev, inc_term_prev, inc_step, iter_count_pos);
+        [delay(cur_index),error_prev_list(cur_index), a_prev_list(cur_index), inc_term_prev, iter_count_pos] = increment_and_compare(delay(cur_index-1), error_prev_list(cur_index-1), inc_term, a_prev_list(cur_index-1), inc_term_prev, inc_step, iter_count_pos);
     end
-    error_prev = 0; a_prev = 0; inc_term_prev = 0; iter_count_neg = 0;
+    inc_term_prev = 0; iter_count_neg = 0;
     for i = 1:31
         cur_index = n0_index - i;
         inc_term = A_0*(2*(i-1)+1) + C_0;
-        [delay(cur_index),error_prev, a_prev, inc_term_prev, iter_count_neg] = increment_and_compare(delay(cur_index+1), error_prev, inc_term, a_prev, inc_term_prev, inc_step,iter_count_neg);
+        [delay(cur_index),error_prev_list(cur_index), a_prev_list(cur_index), inc_term_prev, iter_count_neg] = increment_and_compare(delay(cur_index+1), error_prev_list(cur_index+1), inc_term, a_prev_list(cur_index+1), inc_term_prev, inc_step,iter_count_neg);
     end
 
     if iter_count_neg > iter_count_pos
@@ -194,6 +194,8 @@ function [delay_list,iter_count] = delay_ref_point(f_s, p, v, R_0, n0_index, ang
     end
 
     delay_list = delay;
+    a_list_ref = a_prev_list;
+    error_list_ref = error_prev_list;
 end
 
 % Increment and compare block for initial point on scanline (replaces square root)
@@ -215,7 +217,7 @@ function [N_next,error_next, a_next, inc_term_next, iter_count_out] = increment_
     cur_error = 0;
     for i = 1:100
         iter_count = iter_count + 1;
-        a = a + sign_bit*inc_step;
+        %a = a + sign_bit*inc_step;
         if sign_bit == -1
             if 2*a*N_prev+a^2 < inc_term_w_error
                 a = a - sign_bit*inc_step;
@@ -229,6 +231,7 @@ function [N_next,error_next, a_next, inc_term_next, iter_count_out] = increment_
                 break;
             end
         end
+        a = a + sign_bit*inc_step;
     end
 
     % Values to propagate to next calculation
@@ -240,7 +243,7 @@ function [N_next,error_next, a_next, inc_term_next, iter_count_out] = increment_
 end
 
 % Next scanpoints delay calculation
-function delay_array = delay_scanline(R_0, f_s, v, n, p, num_points,delay, cordic_iter, angle_deg, inc_step)
+function delay_array = delay_scanline(R_0, f_s, v, n, p, num_points,delay, cordic_iter, angle_deg, inc_step, a_list_ref, error_list_ref)
     % Precalculated CORDIC constants, input except angle stored in memory
     B_cordic = cordic(cordic_iter, angle_deg, 2 * n * p * (f_s/v));
     
@@ -248,8 +251,8 @@ function delay_array = delay_scanline(R_0, f_s, v, n, p, num_points,delay, cordi
     B_n = 2 * R_0 * (f_s/v) - B_cordic;
     
     scanline_delays = zeros(num_points, length(delay));
-    error_prev = zeros(length(delay));
-    a_prev = zeros(length(delay));
+    error_prev = error_list_ref;
+    a_prev = zeros(length(delay));%a_list_ref;
     inc_term_prev = zeros(length(delay));
     
     scanline_delays(1,:) = delay;
