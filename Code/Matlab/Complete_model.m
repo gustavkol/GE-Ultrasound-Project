@@ -15,8 +15,10 @@ n0_index    = 32;                   % Array index of element in origo
 inc_step    = 1/8;                  % Increment step for a, inc_step*2 mirrors approximal maximal error
 
 % Variable input values, used as reference point in scanline
-R_0         = 50*10^-3;
-angle_deg   = 90-40;
+R_0         = 1*10^-3;
+scan_length = 255*10^-3 - R_0;
+num_points  = round(scan_length / delta_length);
+angle_deg   = 50;
 
 % Calculating reference delays
 angle = angle_deg*pi/180;
@@ -45,7 +47,7 @@ delay = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter, inc_st
 scanline_delays = delay_scanline(R_0, f_s, v, n, p, num_points, delay, cordic_iter, angle_deg, inc_step);
 
 % Plotting result with respect to reference %
-plot_results(n, delay, angle, R_0, scanline_delays, delta_length, num_points, n0_index, delay_reference, x, delay_reference_scanline, 32+17);
+plot_results(n, delay, angle, R_0, scanline_delays, delta_length, num_points, n0_index, delay_reference, x, delay_reference_scanline, 32+16);
 
 
 
