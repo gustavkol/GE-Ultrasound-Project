@@ -12,12 +12,14 @@ delta_length= v/f_s;                % Increment length for scanline
 num_points  = 2^12;                 % Number of points on scanline
 scan_length = num_points*delta_length;% Length of scanline
 n0_index    = 32;                   % Array index of element in origo
-inc_step    = 1/8;                  % Increment step for a, inc_step*2 mirrors approximal maximal error
+inc_step    = 1/4;                  % Increment step for a, inc_step*2 mirrors approximal maximal error
 
 %Error is symmetric around 90 degrees -> only scanning one quadrant
 max_error_neg = zeros(255); 
 max_error_pos = zeros(255);
 iter = 0;
+max_iter_ref_point = zeros(255);
+max_iter_ref_point_angle = zeros(45);
 for R_0 = 1*10^-3:10^-3:255*10^-3
     iter = iter+1;
     scanlength = 255*10^-3 - R_0;
@@ -46,6 +48,14 @@ for R_0 = 1*10^-3:10^-3:255*10^-3
         % SYSTEM FUNCTIONALITY %
         % Step 1: Using iterative approach to calculate delays for each element for first point in scanline
         [delay,iter_count,a_list_ref,error_list_ref] = delay_ref_point(f_s, p, v, R_0, n0_index, angle_deg, cordic_iter, inc_step);
+        if abs(iter_count) > max_iter_ref_point(iter)
+            max_iter_ref_point(iter) = abs(iter_count);
+        end
+        if abs(iter_count) > max_iter_ref_point_angle(angle_deg-44)
+            max_iter_ref_point_angle(angle_deg-44) = abs(iter_count);
+        end
+        
+
         disp("R_0: " + R_0 + ", angle: " + angle_deg)
         disp("Iterations (clock cycles) needed for reference point delay calculations: " + iter_count);
         % Step 2: Calculating delays in next point on scanline for all elements
@@ -61,15 +71,29 @@ for R_0 = 1*10^-3:10^-3:255*10^-3
 end
 
 figure(1);
-plot(max_error_pos(1:254), 'g'); hold on; plot(abs(max_error_neg(1:254)),'r')
-legend("Maximal positive error", "Maximal negative error")
-ylabel("Error in sample frequency cycles/periods")
-title("Maximal delay error with regards to initial scanpoint length R_0")
-xlabel("R_0 (mm)")
+plot(max_error_pos(1:254), 'g'); hold on; plot(abs(max_error_neg(1:254)),'r');
+legend("Maximal positive error", "Maximal negative error");
+ylabel("Error in sample frequency cycles/periods");
+title("Maximal delay error with regards to initial scanpoint length R_0, step size = " + inc_step);
+xlabel("R_0 (mm)");
+
+% Plotting iterations needed for ref point as a function of R_0
+figure(2)
+plot(1:255,max_iter_ref_point(1:255))
+title("Maximal number of iterations needed with regards to R_0, step size = " + inc_step);
+ylabel("Iterations needed");
+xlabel("R_0 (mm)");
+
+% Plotting iterations needed for ref point as a function of R_0
+figure(3)
+plot(45:1:90,max_iter_ref_point_angle(1:46));
+title("Maximal number of iterations needed with regards to angle, step size = " + inc_step);
+ylabel("Iterations needed");
+xlabel("angle (degrees)");
 %% 
 
 %Looking at some interesting R_0 values
-figure(2);
+figure(4);
 R_0_list = [10^-3,2*10^-3, 129*10^-3, 242*10^-3];
 max_error_angle = zeros(46);
 for i = 1:length(R_0_list)
@@ -156,7 +180,7 @@ for i = 1:length(R_0_list)
     scanline_delays = delay_scanline(R_0, f_s, v, n, p, num_points, delay, cordic_iter, angle_deg, inc_step,a_list_ref, error_list_ref);
     
     % Sweeping scanline %
-    figure(3+i);
+    figure(4+i);
     [discard,discard1] = sweep_scanline(R_0, angle, scanline_delays, num_points, delay_reference_scanline, 0, 0, 1);
 end
 %% 
@@ -175,12 +199,38 @@ function [delay_list,iter_count,a_list_ref,error_list_ref] = delay_ref_point(f_s
     
     % Iteratively calculating delay for all elements for first scan point
     error_prev_list = zeros(64); a_prev_list = zeros(64); inc_term_prev = 0; iter_count_pos = 0;
+    
+    if angle_deg >= 120
+        a_prev_list(n0_index) = 2;
+    elseif angle_deg >= 105
+        a_prev_list(n0_index) = 1;
+    elseif angle_deg <= 55
+        a_prev_list(n0_index) = -2;
+    elseif angle_deg <= 75
+        a_prev_list(n0_index) = -1;
+    else
+        a_prev_list(n0_index) = 0;
+    end
+
     for i = 1:32
         cur_index = n0_index + i;
         inc_term = A_0*(2*(i-1)+1) - C_0;
         [delay(cur_index),error_prev_list(cur_index), a_prev_list(cur_index), inc_term_prev, iter_count_pos] = increment_and_compare(delay(cur_index-1), error_prev_list(cur_index-1), inc_term, a_prev_list(cur_index-1), inc_term_prev, inc_step, iter_count_pos);
     end
     inc_term_prev = 0; iter_count_neg = 0;
+
+    if angle_deg >= 130
+        a_prev_list(n0_index) = -2;
+    elseif angle_deg >= 115
+        a_prev_list(n0_index) = -1;
+    elseif angle_deg <= 60
+        a_prev_list(n0_index) = 2;
+    elseif angle_deg <= 75
+        a_prev_list(n0_index) = 1;
+    else
+        a_prev_list(n0_index) = 0;
+    end
+
     for i = 1:31
         cur_index = n0_index - i;
         inc_term = A_0*(2*(i-1)+1) + C_0;
@@ -217,7 +267,7 @@ function [N_next,error_next, a_next, inc_term_next, iter_count_out] = increment_
     cur_error = 0;
     for i = 1:100
         iter_count = iter_count + 1;
-        %a = a + sign_bit*inc_step;
+        a = a + sign_bit*inc_step;          
         if sign_bit == -1
             if 2*a*N_prev+a^2 < inc_term_w_error
                 a = a - sign_bit*inc_step;
@@ -231,7 +281,7 @@ function [N_next,error_next, a_next, inc_term_next, iter_count_out] = increment_
                 break;
             end
         end
-        a = a + sign_bit*inc_step;
+        %a = a + sign_bit*inc_step;
     end
 
     % Values to propagate to next calculation
@@ -252,7 +302,7 @@ function delay_array = delay_scanline(R_0, f_s, v, n, p, num_points,delay, cordi
     
     scanline_delays = zeros(num_points, length(delay));
     error_prev = error_list_ref;
-    a_prev = zeros(length(delay));%a_list_ref;
+    a_prev = zeros(length(delay));
     inc_term_prev = zeros(length(delay));
     
     scanline_delays(1,:) = delay;
