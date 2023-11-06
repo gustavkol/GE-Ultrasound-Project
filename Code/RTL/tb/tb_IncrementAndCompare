@@ -1,0 +1,93 @@
+`timescale 1 ns / 1 ps
+module tb_IncrementAndCompare;
+    
+    parameter   STEP_SIZE = 1,
+                INC_TERM_DW_INTEGER = 16,
+                N_DW_INTEGER = 13,
+                ERROR_DW_INTEGER = 14,
+                A_DW_INTEGER = 3,
+                DW_FRACTIONAL = 4;
+
+    // input signals
+    reg                                         clk, rst, initiate, ack;
+    reg [N_DW_INTEGER+DW_FRACTIONAL:0]          n_prev;
+    reg [A_DW_INTEGER+DW_FRACTIONAL:0]          a_prev;
+    reg [2*A_DW_INTEGER+DW_FRACTIONAL:0]        a_prev_sq;
+    reg [INC_TERM_DW_INTEGER+DW_FRACTIONAL:0]            comp_term;
+    reg [INC_TERM_DW_INTEGER+DW_FRACTIONAL:0]   comp_term_prev;
+    reg [ERROR_DW_INTEGER+DW_FRACTIONAL:0]      error_prev;
+
+    // output signals
+    wire [N_DW_INTEGER+DW_FRACTIONAL:0]         n_next;
+    wire [ERROR_DW_INTEGER+DW_FRACTIONAL:0]     error_next;
+    wire [A_DW_INTEGER+DW_FRACTIONAL:0]         a_next;
+    wire [2*A_DW_INTEGER+DW_FRACTIONAL:0]       a_next_sq;
+    wire [INC_TERM_DW_INTEGER+DW_FRACTIONAL:0]  comp_term_next;
+    wire                                        ready;
+
+    // generation of the clock signal
+    always  #5 clk = ~clk;
+
+    // Stimuli
+    initial begin
+        clk = 0; rst = 0; initiate = 0; ack = 0;
+
+        #5 rst           = 1;
+        #40 rst          = 0;
+        #70 initiate     = 1;
+    end
+
+    // Input values
+    assign n_prev           = 17'b0000000010011_0000;       // 19.2338
+    assign a_prev           = 7'b011_0000;                  // 3
+    assign a_prev_sq        = 10'b001001_0000;              // 9
+    assign comp_term        = 20'b0000010001110_1000;       // 142.5
+    assign comp_term_prev   = 20'b0000001101010_0110;       // 106.4026
+    assign error_prev       = 18'b00000000000011_0100;      // 3.2264
+
+    // Instantiating the calculator module
+    IncrementAndCompare #(
+        .STEP_SIZE(STEP_SIZE),
+        .INC_TERM_DW_INTEGER(INC_TERM_DW_INTEGER),
+        .N_DW_INTEGER(N_DW_INTEGER),
+        .ERROR_DW_INTEGER(ERROR_DW_INTEGER),
+        .A_DW_INTEGER(A_DW_INTEGER),
+        .DW_FRACTIONAL(DW_FRACTIONAL)
+    ) inst1 (
+        .clk(clk),
+        .rst(rst),
+        // Input
+        .initiate(initiate),
+        .n_prev(n_prev),
+        .a_prev(a_prev),
+        .a_prev_sq(a_prev_sq),
+        .comp_term(comp_term),
+        .comp_term_prev(comp_term_prev),
+        .error_prev(error_prev),
+        // Output
+        .n_next(n_next),
+        .error_next(error_next),
+        .a_next(a_next),
+        .a_next_sq(a_next_sq),
+        .comp_term_next(comp_term_next),
+        .ready(ready)
+    );
+
+
+    real in_n_prev_fixed,in_a_prev_fixed,in_a_prev_sq_fixed,in_comp_term_fixed,in_comp_term_prev_fixed,in_error_prev_fixed;
+    real out_n_next_fixed,out_error_next_fixed,out_a_next_fixed,out_a_next_sq_fixed,out_comp_term_next_fixed;
+    always @* begin
+        in_n_prev_fixed            = n_prev*(2.0**-4);
+        in_a_prev_fixed            = a_prev*(2.0**-4);
+        in_a_prev_sq_fixed         = a_prev_sq*(2.0**-4);
+        in_comp_term_fixed         = comp_term*(2.0**-4);
+        in_comp_term_prev_fixed    = comp_term_prev*(2.0**-4);
+        in_error_prev_fixed        = error_prev*(2.0**-4);
+
+        out_n_next_fixed            = n_next*(2.0**-4);
+        out_error_next_fixed        = error_next*(2.0**-4);
+        out_a_next_fixed            = a_next*(2.0**-4);
+        out_a_next_sq_fixed         = a_next_sq*(2.0**-4);
+        out_comp_term_next_fixed    = comp_term_next*(2.0**-4);
+    end
+endmodule
