@@ -5,25 +5,25 @@ module tb_IncrementAndCompare;
                 INC_TERM_DW_INTEGER = 16,
                 N_DW_INTEGER = 13,
                 ERROR_DW_INTEGER = 14,
-                A_DW_INTEGER = 3,
+                A_DW_INTEGER = 4,
                 DW_FRACTIONAL = 4;
 
     // input signals
-    reg                                         clk, rst, initiate, ack;
-    reg [N_DW_INTEGER+DW_FRACTIONAL:0]          n_prev;
-    reg [A_DW_INTEGER+DW_FRACTIONAL:0]          a_prev;
-    reg [2*A_DW_INTEGER+DW_FRACTIONAL:0]        a_prev_sq;
-    reg [INC_TERM_DW_INTEGER+DW_FRACTIONAL:0]            comp_term;
-    reg [INC_TERM_DW_INTEGER+DW_FRACTIONAL:0]   comp_term_prev;
-    reg [ERROR_DW_INTEGER+DW_FRACTIONAL:0]      error_prev;
+    reg                                                 clk, rst, initiate, ack;
+    reg [N_DW_INTEGER+DW_FRACTIONAL:0]                  n_prev;
+    reg signed [A_DW_INTEGER+DW_FRACTIONAL:0]           a_prev;
+    reg [2*A_DW_INTEGER+DW_FRACTIONAL:0]                a_prev_sq;
+    reg signed [INC_TERM_DW_INTEGER+DW_FRACTIONAL:0]    comp_term;
+    reg signed [INC_TERM_DW_INTEGER+DW_FRACTIONAL:0]    comp_term_prev;
+    reg signed [ERROR_DW_INTEGER+DW_FRACTIONAL:0]       error_prev;
 
     // output signals
-    wire [N_DW_INTEGER+DW_FRACTIONAL:0]         n_next;
-    wire [ERROR_DW_INTEGER+DW_FRACTIONAL:0]     error_next;
-    wire [A_DW_INTEGER+DW_FRACTIONAL:0]         a_next;
-    wire [2*A_DW_INTEGER+DW_FRACTIONAL:0]       a_next_sq;
-    wire [INC_TERM_DW_INTEGER+DW_FRACTIONAL:0]  comp_term_next;
-    wire                                        ready;
+    wire [N_DW_INTEGER+DW_FRACTIONAL:0]                 n_next;
+    wire signed [ERROR_DW_INTEGER+DW_FRACTIONAL:0]      error_next;
+    wire signed [A_DW_INTEGER+DW_FRACTIONAL:0]          a_next;
+    wire [2*A_DW_INTEGER+DW_FRACTIONAL:0]               a_next_sq;
+    wire signed [INC_TERM_DW_INTEGER+DW_FRACTIONAL:0]   comp_term_next;
+    wire                                                ready;
 
     // generation of the clock signal
     always  #5 clk = ~clk;
@@ -31,19 +31,45 @@ module tb_IncrementAndCompare;
     // Stimuli
     initial begin
         clk = 0; rst = 0; initiate = 0; ack = 0;
+        n_prev           = 17'b0000000010011_0000;       // 19.2338
+        a_prev           = 8'b0011_0000;                 // 3
+        a_prev_sq        = 10'b001001_0000;              // 9
+        comp_term        = 20'b0000010001110_1000;       // 142.5
+        comp_term_prev   = 20'b0000001101010_0110;       // 106.4026
+        error_prev       = 18'b00000000000011_0100;      // 3.2264
 
         #5 rst           = 1;
         #40 rst          = 0;
         #70 initiate     = 1;
+        #20  initiate     = 0;
+
+
+
+        #100 ack        = 1;
+        #20  ack        = 0;
+        #40 
+        n_prev           = 17'b0000010001001_1100;       // 137.75
+        a_prev           = 8'b0100_0100;                 // 4.25
+        a_prev_sq        = 10'b010010_0001;              // 18.0625
+        comp_term        = 20'b0010001101010_1101;       // 1130.8125
+        comp_term_prev   = 20'b0010010000000_1011;       // 1152.6875
+        error_prev       = 18'b00000000001001_0111;      // 9.4375
+        #40 initiate     = 1;
+        #20 initiate     = 0;
+
+        #100 ack        = 1;
+        #20  ack        = 0;
+        #40 
+        n_prev           = 17'b0000000010000_0100;  //16.25
+        a_prev           = 9'b11110_0000;             //-2;
+        a_prev_sq        = 10'b00000100_0000;       // 4
+        comp_term        = 21'b11111111110110100_0000;       // -76.6875
+        comp_term_prev   = 0;
+        error_prev       = 0;
+        #40 initiate     = 1;
     end
 
     // Input values
-    assign n_prev           = 17'b0000000010011_0000;       // 19.2338
-    assign a_prev           = 7'b011_0000;                  // 3
-    assign a_prev_sq        = 10'b001001_0000;              // 9
-    assign comp_term        = 20'b0000010001110_1000;       // 142.5
-    assign comp_term_prev   = 20'b0000001101010_0110;       // 106.4026
-    assign error_prev       = 18'b00000000000011_0100;      // 3.2264
 
     // Instantiating the calculator module
     IncrementAndCompare #(
@@ -58,6 +84,7 @@ module tb_IncrementAndCompare;
         .rst(rst),
         // Input
         .initiate(initiate),
+        .ack(ack),
         .n_prev(n_prev),
         .a_prev(a_prev),
         .a_prev_sq(a_prev_sq),
@@ -78,16 +105,16 @@ module tb_IncrementAndCompare;
     real out_n_next_fixed,out_error_next_fixed,out_a_next_fixed,out_a_next_sq_fixed,out_comp_term_next_fixed;
     always @* begin
         in_n_prev_fixed            = n_prev*(2.0**-4);
-        in_a_prev_fixed            = a_prev*(2.0**-4);
         in_a_prev_sq_fixed         = a_prev_sq*(2.0**-4);
-        in_comp_term_fixed         = comp_term*(2.0**-4);
-        in_comp_term_prev_fixed    = comp_term_prev*(2.0**-4);
-        in_error_prev_fixed        = error_prev*(2.0**-4);
+        in_a_prev_fixed            = a_prev*(2.0**-4);          // SIGNED
+        in_comp_term_fixed         = comp_term*(2.0**-4);       // SIGNED
+        in_comp_term_prev_fixed    = comp_term_prev*(2.0**-4);  // SIGNED
+        in_error_prev_fixed        = error_prev*(2.0**-4);      // SIGNED
 
         out_n_next_fixed            = n_next*(2.0**-4);
-        out_error_next_fixed        = error_next*(2.0**-4);
-        out_a_next_fixed            = a_next*(2.0**-4);
+        out_error_next_fixed        = error_next*(2.0**-4);     // SIGNED
+        out_a_next_fixed            = a_next*(2.0**-4);         // SIGNED
         out_a_next_sq_fixed         = a_next_sq*(2.0**-4);
-        out_comp_term_next_fixed    = comp_term_next*(2.0**-4);
+        out_comp_term_next_fixed    = comp_term_next*(2.0**-4); // SIGNED
     end
 endmodule
