@@ -63,9 +63,14 @@ module IncrementAndCompare  #(
     // Sum of increment term in comparator (should work as a wire)
     logic signed [INC_TERM_DW_INTEGER+DW_FRACTIONAL:0]      comparator_sum;
     logic signed [A_DW_INTEGER+DW_FRACTIONAL:0]             a_prev_shifted, a_cur_shifted;
-    assign comparator_sum = a_mul_n_integer_reg + a_mul_n_fractional_reg + a_prev_sq_reg + inc_term_reg; // current 2*a*N + a^2
-    assign a_prev_shifted = (a_prev_reg >>> 1);
-    assign a_cur_shifted  = (a_cur_reg >>> 1);
+    logic signed [INC_TERM_DW_INTEGER+DW_FRACTIONAL:0]      delta_increment_term_pos,delta_increment_term_neg;
+
+    assign comparator_sum           = a_mul_n_integer_reg + a_mul_n_fractional_reg + a_prev_sq_reg + inc_term_reg; // current 2*a*N + a^2
+    assign a_prev_shifted           = (a_prev_reg >>> 1);
+    assign a_cur_shifted            = (a_cur_reg >>> 1);
+    assign delta_increment_term_neg = - (n_cur_reg >> 1) - a_prev_shifted + increment - signed'({counter,4'd0} >> 3);
+    assign delta_increment_term_pos = (n_cur_reg >> 1) + a_prev_shifted + increment + signed'({counter,4'd0} >> 3);
+
 
     // Locking next state
     always @(posedge clk) begin
@@ -137,7 +142,6 @@ module IncrementAndCompare  #(
                     a_cur_sq_reg        <= a_prev_sq;
                     a_prev_sq_reg       <= a_prev_sq;
                     comp_term_cur_reg   <= comp_term + error_prev;
-                    // TODO : FILL WITH 1's WHEN A < 0
                     case(a_prev[6:4])    // Calculating integer part of 2*N_prev*a_prev
                         3'b000:     a_mul_n_integer_reg <= 0;     
                         3'b001:     a_mul_n_integer_reg <= (n_prev << 1);                   //2*N_prev
@@ -179,15 +183,21 @@ module IncrementAndCompare  #(
                             n_cur_reg           <= n_cur_reg + a_cur_reg + stepsize;
                             a_cur_reg           <= a_cur_reg + stepsize;
                             a_cur_sq_reg        <= a_cur_sq_reg + a_cur_shifted + increment;
-                            error_cur_reg       <= comp_term_cur_reg - comparator_sum_prev_reg;
-                            comp_term_next_reg  <= comparator_sum_prev_reg;
+                            if (counter == 0) begin
+                                error_cur_reg       <= comp_term_cur_reg - (comparator_sum + delta_increment_term_pos);
+                                comp_term_next_reg  <= comparator_sum + delta_increment_term_pos;
+                            end
+                            else begin
+                                error_cur_reg       <= comp_term_cur_reg - comparator_sum_prev_reg;
+                                comp_term_next_reg  <= comparator_sum_prev_reg;
+                            end
                             ready_reg           <= 1'b1;
                         end
                         else begin   
                             // Updating incremented terms
                             comparator_sum_prev_reg <= comparator_sum;
                             a_cur_reg    <= a_cur_reg - stepsize;
-                            inc_term_reg <= inc_term_reg - (n_cur_reg >> 1) - a_prev_shifted + increment - signed'({counter,4'd0} >> 3);
+                            inc_term_reg <= inc_term_reg + delta_increment_term_neg;
                             a_cur_sq_reg <= a_cur_sq_reg - a_cur_shifted + increment;
                         end
 
@@ -197,15 +207,21 @@ module IncrementAndCompare  #(
                             n_cur_reg           <= n_cur_reg + a_cur_reg - stepsize;
                             a_cur_reg           <= a_cur_reg - stepsize;
                             a_cur_sq_reg        <= a_cur_sq_reg - a_cur_shifted + increment;
-                            error_cur_reg       <= comp_term_cur_reg - comparator_sum_prev_reg;
-                            comp_term_next_reg  <= comparator_sum_prev_reg;
+                            if (counter == 0) begin
+                                error_cur_reg       <= comp_term_cur_reg - (comparator_sum + delta_increment_term_neg);
+                                comp_term_next_reg  <= comparator_sum + delta_increment_term_neg;
+                            end
+                            else begin
+                                error_cur_reg       <= comp_term_cur_reg - comparator_sum_prev_reg;
+                                comp_term_next_reg  <= comparator_sum_prev_reg;
+                            end
                             ready_reg           <= 1'b1;
                         end
                         else begin   
                             // Updating incremented terms
 			                comparator_sum_prev_reg <= comparator_sum;
                             a_cur_reg    <= a_cur_reg + stepsize;
-                            inc_term_reg <= inc_term_reg + (n_cur_reg >> 1) + a_prev_shifted + increment + signed'({counter,4'd0} >> 3);
+                            inc_term_reg <= inc_term_reg + delta_increment_term_pos;
                             a_cur_sq_reg <= a_cur_sq_reg + a_cur_shifted + increment;
                         end
                 end
