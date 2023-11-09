@@ -52,7 +52,7 @@ module tb_IncrementAndCompare;
         {21'b00000010001101010_1110}        // 1130.875
     };
 
-    reg signed [30:0][INC_TERM_DW_INTEGER+DW_FRACTIONAL:0] comp_term_array_neg = {      // comparator terms for pos n when angle = 135 and R_0 = 1mm
+    reg signed [30:0][INC_TERM_DW_INTEGER+DW_FRACTIONAL:0] comp_term_array_neg = {      // comparator terms for neg n when angle = 135 and R_0 = 1mm
         {21'b11111111110110011_0101},       // -76.6875
         {21'b11111111111010100_0100},       // -43.75
         {21'b11111111111110101_0011},       // -10.8125
