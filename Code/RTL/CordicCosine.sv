@@ -18,25 +18,26 @@ module CordicCosine # (
     enum {LOAD, RUN, WAIT, IDLE} state, nextState;
 
     // Internal registers
-    logic signed [DW_CALCULATION_TERMS+DW_FRACTION:0] x_cur_reg;            // NOTE: may not have to be signed
-    logic signed [DW_CALCULATION_TERMS+DW_FRACTION:0] y_cur_reg;            // NOTE: may not have to be signed
-    logic signed [DW_ANGLE+DW_FRACTION:0]             angle_cur_reg;        // NOTE: may not have to be signed
+    logic signed [DW_CALCULATION_TERMS+DW_FRACTION:0]   x_cur_reg;            // NOTE: may not have to be signed
+    logic signed [DW_CALCULATION_TERMS+DW_FRACTION:0]   y_cur_reg;            // NOTE: may not have to be signed
+    logic signed [DW_ANGLE+DW_FRACTION:0]               angle_cur_reg;        // NOTE: may not have to be signed
     logic                                               sign_bit;
     logic                                               sign_increment;
     logic                                               done_reg;
-    logic [2:0]                                         counter;
+    logic [3:0]                                         counter;
 
-    localparam signed [6+6:0] ROTATED_ANGLE_ARRAY [7:0] = {      // rotated angle for each iteration
+    localparam signed [6+6:0] ROTATED_ANGLE_ARRAY [8:0] = {      // rotated angle for each iteration
+        {13'b0000000_010000},          // 0.25
         {13'b0000000_011100},          // 0.4375
         {13'b0000000_111000},          // 0.875
         {13'b0000001_110000},          // 1.75
         {13'b0000011_100100},          // 3.5625
         {13'b0000111_001000},          // 7.125
-        {13'b0001110_000100},          // 14.0625
+        {13'b0001110_001000},          // 14.125
         {13'b0011010_100100},          // 26.5625
-        {13'b0101101_000000}          // 45
+        {13'b0101101_000000}            // 45
     };
-    localparam [2:0] num_iterations = 3'd8;
+    localparam [3:0] num_iterations = 4'd9;
 
     logic signed [DW_ANGLE+DW_FRACTION+1:0] next_angle;
     assign next_angle = (sign_increment == 1'b0) ? angle_cur_reg - ROTATED_ANGLE_ARRAY[counter]  :   angle_cur_reg + ROTATED_ANGLE_ARRAY[counter];
@@ -62,7 +63,7 @@ module CordicCosine # (
             case (state)
                 IDLE:       if (initiate)                           nextState = LOAD;
                 LOAD:                                               nextState = RUN;
-                RUN:        if (counter == num_iterations-1'b1)     nextState = WAIT;
+                RUN:        if (counter == num_iterations - 1'd1)   nextState = WAIT;
                 WAIT:       if (ack)                                nextState = IDLE;
             endcase
         end
