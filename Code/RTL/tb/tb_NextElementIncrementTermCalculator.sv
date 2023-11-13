@@ -11,7 +11,7 @@ module tb_calculator;
     reg [ANGLE_DW-1:0]              angle;
 
     // output signals
-    wire [DW_INTEGER+DW_FRACTION:0] output_term;
+    wire [DW_INTEGER+DW_FRACTION:0] output_term_pos_n, output_term_neg_n;
     wire                                ready;
 
     integer i;
@@ -59,7 +59,8 @@ module tb_calculator;
         .r_0(r_0),
         .angle(angle),
 
-        .output_term(output_term),
+        .output_term_pos_n(output_term_pos_n),
+        .output_term_neg_n(output_term_neg_n),
         .ready(ready)
     );
 endmodule
