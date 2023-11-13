@@ -63,14 +63,14 @@ module NextPointIncrementTermCalculator  #(
             nextState = IDLE;
         else begin
             case (state)
-                IDLE:   if(configure)           nextState = CONFIGURE;
-                CONFIGURE: if(cordic_ready)     nextState = WAIT_CONFIGURE;
-                WAIT_CONFIGURE: if (ack)        nextState = RUN1;
-                RUN0:                           nextState = WAIT;   // Calculating for element n = 0
-                RUN1:                           nextState = WAIT;   // Calculating for element except n = 0
+                IDLE:           if(configure)       nextState = CONFIGURE;
+                CONFIGURE:      if(cordic_ready)    nextState = WAIT_CONFIGURE;
+                WAIT_CONFIGURE: if (ack)            nextState = RUN1;
+                RUN0:                               nextState = WAIT;
+                RUN1:                               nextState = WAIT;
                 WAIT: begin
-                    if (ack && last_element)    nextState = RUN0;
-                    else if (ack)               nextState = RUN1;
+                    if (ack && last_element)        nextState = RUN0;
+                    else if (ack)                   nextState = RUN1;
                 end
             endcase
         end
@@ -79,34 +79,34 @@ module NextPointIncrementTermCalculator  #(
     // Calculation functionality
     always @(posedge clk) begin
         if (rst) begin
-            cordic_x_scale   <= '0;
-            output_term_pos_n_reg <= '0;
-            output_term_neg_n_reg <= '0;
-            angle_reg       <= '0;
-            counter_elements<= '0;
-            const_R_0_term  <= '0;
-            value_N0        <= '0;
-            cordic_out      <= '0;
-            cordic_initiate <= 1'b0;
-            last_element    <= 1'b0;
-            ready_reg       <= 1'b0;
-            cordic_ack      <= 1'b0;
+            cordic_x_scale          <= '0;
+            output_term_pos_n_reg   <= '0;
+            output_term_neg_n_reg   <= '0;
+            angle_reg               <= '0;
+            counter_elements        <= '0;
+            const_R_0_term          <= '0;
+            value_N0                <= '0;
+            cordic_out              <= '0;
+            cordic_initiate         <= 1'b0;
+            last_element            <= 1'b0;
+            ready_reg               <= 1'b0;
+            cordic_ack              <= 1'b0;
         end
         else begin
             case(state)
                 IDLE: begin     // RESET ALL VALUES
-                    cordic_x_scale      <= '0;
+                    cordic_x_scale          <= '0;
                     output_term_pos_n_reg   <= '0;
                     output_term_neg_n_reg   <= '0;
-                    angle_reg           <= '0;
-                    counter_elements    <= '0;
-                    const_R_0_term      <= '0;
-                    value_N0            <= '0;
-                    cordic_out          <= '0;
-                    cordic_initiate     <= 1'b0;
-                    last_element        <= 1'b0;
-                    ready_reg           <= 1'b0;
-                    cordic_ack          <= 1'b0;
+                    angle_reg               <= '0;
+                    counter_elements        <= '0;
+                    const_R_0_term          <= '0;
+                    value_N0                <= '0;
+                    cordic_out              <= '0;
+                    cordic_initiate         <= 1'b0;
+                    last_element            <= 1'b0;
+                    ready_reg               <= 1'b0;
+                    cordic_ack              <= 1'b0;
                 end
                 CONFIGURE: begin // CONST MULTIPLIER
                     // NOTE: CAN BE DONE ITERATIVELY USING A SINGLE 2-ADDER
@@ -118,12 +118,12 @@ module NextPointIncrementTermCalculator  #(
                 WAIT_CONFIGURE: begin // Making output for element n = 0 in point k = 1 ready
                     cordic_initiate     <= 1'b0;
                     if (cordic_ready) begin
-                        output_term_pos_n_reg <= 10'b01_00000000 + signed'(const_R_0_term);           // 1 + 2*R_0*f_s/v_s
-                        output_term_neg_n_reg <= 10'b01_00000000 + signed'(const_R_0_term);           // 1 + 2*R_0*f_s/v_s
-                        value_N0        <= 10'b01_00000000 + signed'(const_R_0_term);           // 1 + 2*R_0*f_s/v_s
-                        cordic_out      <= cordic_result;                                       // 2*p*f_s/v_s * cos(angle)
-                        ready_reg       <= cordic_ready;
-                        cordic_ack      <= 1'b1;
+                        output_term_pos_n_reg   <= 10'b01_00000000 + signed'(const_R_0_term);           // 1 + 2*R_0*f_s/v_s
+                        output_term_neg_n_reg   <= 10'b01_00000000 + signed'(const_R_0_term);           // 1 + 2*R_0*f_s/v_s
+                        value_N0                <= 10'b01_00000000 + signed'(const_R_0_term);           // 1 + 2*R_0*f_s/v_s
+                        cordic_out              <= cordic_result;                                       // 2*p*f_s/v_s * cos(angle)
+                        ready_reg               <= cordic_ready;
+                        cordic_ack              <= 1'b1;
                     end
                 end
                 RUN0: begin // Calculating value for element n = 0
@@ -133,9 +133,9 @@ module NextPointIncrementTermCalculator  #(
                     ready_reg               <= 1'b1;
                 end
                 RUN1: begin // Calculating value for element n+1
-                    output_term_pos_n_reg       <= output_term_pos_n_reg - cordic_out;     // (1 + 2*R_0*f_s/v_s + 2k) - n(2*p*f_s/v_s * cos(angle))
-                    output_term_neg_n_reg       <= output_term_neg_n_reg + cordic_out;
-                    ready_reg                   <= 1'b1;
+                    output_term_pos_n_reg   <= output_term_pos_n_reg - cordic_out;     // (1 + 2*R_0*f_s/v_s + 2k) - n(2*p*f_s/v_s * cos(angle))
+                    output_term_neg_n_reg   <= output_term_neg_n_reg + cordic_out;
+                    ready_reg               <= 1'b1;
                     if (counter_elements == 5'd30) begin
                         last_element        <= 1'b1;
                         counter_elements    <= 5'd0;
