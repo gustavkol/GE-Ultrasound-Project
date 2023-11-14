@@ -15,6 +15,7 @@ module NextPointIncrementTermCalculator  #(
                             // Output values
                             output signed   [DW_INTEGER+DW_FRACTION:0]  output_term_pos_n,  // Comparator term output for pos n
                             output signed   [DW_INTEGER+DW_FRACTION:0]  output_term_neg_n,  // Comparator term output for neg n
+                            output                                      last_element,       // Value for last element ready
                             output                                      ready               // Result ready signal
                             );
 
@@ -34,7 +35,7 @@ module NextPointIncrementTermCalculator  #(
 
     // Control signals
     logic [5:0]                         counter_elements;
-    logic                               last_element;
+    logic                               last_element_reg;
     logic                               ready_reg;
 
     // Cordic signals
@@ -48,6 +49,7 @@ module NextPointIncrementTermCalculator  #(
     assign ready                = (state == WAIT || state == WAIT_CONFIGURE) ? ready_reg : '0;
     assign output_term_pos_n    = (state == WAIT || state == WAIT_CONFIGURE) ? output_term_pos_n_reg : '0;
     assign output_term_neg_n    = (state == WAIT || state == WAIT_CONFIGURE) ? output_term_neg_n_reg : '0;
+    assign last_element         = last_element_reg;
 
     // Locking next state
     always @(posedge clk) begin
@@ -69,7 +71,7 @@ module NextPointIncrementTermCalculator  #(
                 RUN0:                               nextState = WAIT;
                 RUN1:                               nextState = WAIT;
                 WAIT: begin
-                    if (ack && last_element)        nextState = RUN0;
+                    if (ack && last_element_reg)    nextState = RUN0;
                     else if (ack)                   nextState = RUN1;
                 end
             endcase
@@ -88,7 +90,7 @@ module NextPointIncrementTermCalculator  #(
             value_N0                <= '0;
             cordic_out              <= '0;
             cordic_initiate         <= 1'b0;
-            last_element            <= 1'b0;
+            last_element_reg            <= 1'b0;
             ready_reg               <= 1'b0;
             cordic_ack              <= 1'b0;
         end
@@ -104,7 +106,7 @@ module NextPointIncrementTermCalculator  #(
                     value_N0                <= '0;
                     cordic_out              <= '0;
                     cordic_initiate         <= 1'b0;
-                    last_element            <= 1'b0;
+                    last_element_reg            <= 1'b0;
                     ready_reg               <= 1'b0;
                     cordic_ack              <= 1'b0;
                 end
@@ -137,7 +139,7 @@ module NextPointIncrementTermCalculator  #(
                     output_term_neg_n_reg   <= output_term_neg_n_reg + cordic_out;
                     ready_reg               <= 1'b1;
                     if (counter_elements == 5'd30) begin
-                        last_element        <= 1'b1;
+                        last_element_reg        <= 1'b1;
                         counter_elements    <= 5'd0;
                     end
                     else
@@ -145,7 +147,7 @@ module NextPointIncrementTermCalculator  #(
                 end
                 WAIT: if(ack) begin
                         ready_reg       <= 1'b0;
-                        last_element    <= 1'b0;
+                        last_element_reg    <= 1'b0;
                     end
             endcase
 		end

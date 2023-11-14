@@ -23,7 +23,8 @@ module IncrementAndCompare  #(
                             output signed   [A_DW_INTEGER+DW_FRACTIONAL:0]          a_next,         // Compensated delay
                             output          [2*A_DW_INTEGER+DW_FRACTIONAL:0]        a_next_sq,      // Compensated squared delay
                             output signed   [INC_TERM_DW_INTEGER+DW_FRACTIONAL:0]   comp_term_next, // Comparator term propagated to next
-                            output                                                  ready           // Result ready signal
+                            output                                                  ready,          // Result ready signal
+                            output                                                  available
                             );
 
     // Constant step size parameter
@@ -59,6 +60,7 @@ module IncrementAndCompare  #(
     assign a_next_sq        = (state == WAIT) ? a_cur_sq_reg        : '0;
     assign comp_term_next   = (state == WAIT) ? comp_term_next_reg  : '0;
     assign ready            = (state == WAIT) ? ready_reg           : '0;
+    assign available        = (state == IDLE);
 
     // Sum of increment term in comparator (should work as a wire)
     logic signed [INC_TERM_DW_INTEGER+DW_FRACTIONAL:0]      comparator_sum;

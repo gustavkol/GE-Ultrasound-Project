@@ -15,6 +15,7 @@ module NextElementIncrementTermCalculator  #(
                             // Output values
                             output signed   [DW_INTEGER+DW_FRACTION:0]              output_term_pos_n,  // Output comparator term (K_n)
                             output signed   [DW_INTEGER+DW_FRACTION:0]              output_term_neg_n,  // Output comparator term (K_n)
+                            output                                                  last_element,
                             output                                                  ready               // Result ready signal
                             );
 
@@ -30,8 +31,8 @@ module NextElementIncrementTermCalculator  #(
     logic signed [DW_FRACTION+DW_INTEGER:0]     output_term_neg_n_reg;
 
     // Control signals
-    logic [5:0]                         counter;
-    logic                               last_element;
+    logic [6:0]                         counter;
+    logic                               last_element_reg;
     logic                               ready_reg;
 
     // Cordic signals
@@ -45,6 +46,7 @@ module NextElementIncrementTermCalculator  #(
     assign ready                = (state == WAIT) ? ready_reg : '0;
     assign output_term_pos_n    = (state == WAIT) ? output_term_pos_n_reg : '0;
     assign output_term_neg_n    = (state == WAIT) ? output_term_neg_n_reg : '0;
+    assign last_element         = last_element_reg;
 
     // Locking next state
     always @(posedge clk) begin
@@ -64,7 +66,7 @@ module NextElementIncrementTermCalculator  #(
                 LOAD:                           nextState = RUN1;
                 RUN1:   if(cordic_ready)        nextState = WAIT;
                 WAIT: begin
-                    if (ack && last_element)    nextState = IDLE;
+                    if (ack && last_element_reg)nextState = IDLE;
                     else if (ack)               nextState = RUN2;
                 end
                 RUN2:                           nextState = WAIT;
@@ -81,7 +83,7 @@ module NextElementIncrementTermCalculator  #(
             angle_reg               <= '0;
             counter                 <= '0;
             cordic_initiate         <= 1'b0;
-            last_element            <= 1'b0;
+            last_element_reg        <= 1'b0;
             ready_reg               <= 1'b0;
             cordic_ack              <= 1'b0;
         end
@@ -94,7 +96,7 @@ module NextElementIncrementTermCalculator  #(
                     angle_reg               <= '0;
                     counter                 <= '0;
                     cordic_initiate         <= 1'b0;
-                    last_element            <= 1'b0;
+                    last_element_reg        <= 1'b0;
                     ready_reg               <= 1'b0;
                     cordic_ack              <= 1'b0;
                 end
@@ -111,7 +113,7 @@ module NextElementIncrementTermCalculator  #(
                         output_term_neg_n_reg   <= signed'(a_0) + cordic_result;      // A_0 + C_0
                         ready_reg               <= cordic_ready;
                         cordic_ack              <=  1'b1;
-                        counter                 <= 5'd1;
+                        counter                 <= 6'd1;
                     end
                 end
                 WAIT: if(ack) begin
@@ -121,8 +123,8 @@ module NextElementIncrementTermCalculator  #(
                     output_term_pos_n_reg   <= output_term_pos_n_reg + (a_0 << 1);    // A_0 * (2*n + 1) - C_0
                     output_term_neg_n_reg   <= output_term_neg_n_reg + (a_0 << 1);    // A_0 * (2*n + 1) + C_0
                     ready_reg               <= 1'b1;
-                    if (counter == 5'd31)
-                        last_element    <= 1'b1;
+                    if (counter == 6'd32)
+                        last_element_reg    <= 1'b1;
                     else
                         counter         <= counter + 1;
                 end
