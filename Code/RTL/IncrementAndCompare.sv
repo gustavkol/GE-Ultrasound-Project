@@ -148,28 +148,34 @@ module IncrementAndCompare  #(
                         3'b000:     a_mul_n_integer_reg <= 0;     
                         3'b001:     a_mul_n_integer_reg <= (n_prev << 1);                   //2*N_prev
                         3'b010:     a_mul_n_integer_reg <= (n_prev << 2);                   //4*N_prev           
-                        3'b011:     a_mul_n_integer_reg <= (n_prev << 1) + (n_prev << 2);   //6*N_prev     
-                        3'b100: begin
-                            if(a_prev[A_DW_INTEGER+DW_FRACTIONAL] == 1'b1)  a_mul_n_integer_reg <= -(n_prev << 3);  // -8*N_prev = -2^3*N_prev
-                            else                                            a_mul_n_integer_reg <= (n_prev << 3);   // 8*N_prev = 2^3*N_prev
+                        3'b011: begin
+                            if(a_prev[A_DW_INTEGER+DW_FRACTIONAL] == 1'b1)  a_mul_n_integer_reg <= -(n_prev << 3);                  // -8*N_prev
+                            else                                            a_mul_n_integer_reg <= (n_prev << 1) + (n_prev << 2);   //  6*N_prev     
                         end
-                        3'b101:     a_mul_n_integer_reg <= -(n_prev << 1) - (n_prev << 2);  //-6*N_prev
-                        3'b110:     a_mul_n_integer_reg <= -(n_prev << 2);                  //-4*N_prev
-                        3'b111:     a_mul_n_integer_reg <= -(n_prev << 1);                  //-2*N_prev
+                        3'b100: begin
+                            if(a_prev[A_DW_INTEGER+DW_FRACTIONAL] == 1'b1)  a_mul_n_integer_reg <= -(n_prev << 2) - (n_prev << 1);  // -6*N_prev
+                            else                                            a_mul_n_integer_reg <= (n_prev << 3);                   // 8*N_prev = 2^3*N_prev
+                        end
+                        3'b101:     a_mul_n_integer_reg <= -(n_prev << 2);                  //-4*N_prev
+                        3'b110:     a_mul_n_integer_reg <= -(n_prev << 1);                  //-2*N_prev
+                        3'b111:     a_mul_n_integer_reg <= 0;
                         default:;  // Should never happen
                     endcase
                     case(a_prev[3:2])               // Calculating fractional part of 2*N_prev*a_prev (step size = 1/4)
-                        2'b00:   a_mul_n_fractional_reg <= 0;
+                        2'b00: begin
+                            if(a_prev[A_DW_INTEGER+DW_FRACTIONAL] == 1'b1)  a_mul_n_fractional_reg <= -(n_prev << 1);               //-2*N_prev
+                            else                                            a_mul_n_fractional_reg <= 0;
+                        end
                         2'b01: begin
-                            if(a_prev[A_DW_INTEGER+DW_FRACTIONAL] == 1'b1)  a_mul_n_fractional_reg <= n_prev + (n_prev >> 1);     // 0.75*2*N_prev
+                            if(a_prev[A_DW_INTEGER+DW_FRACTIONAL] == 1'b1)  a_mul_n_fractional_reg <= - n_prev - (n_prev >> 1);     // -0.75*2*N_prev
                             else                                            a_mul_n_fractional_reg <= (n_prev >> 1);                // 0.25*2*N_prev
                         end
                         2'b10: begin
-                            if(a_prev[A_DW_INTEGER+DW_FRACTIONAL] == 1'b1)  a_mul_n_fractional_reg <= n_prev;                      // 0.5*2*N_prev
+                            if(a_prev[A_DW_INTEGER+DW_FRACTIONAL] == 1'b1)  a_mul_n_fractional_reg <= -n_prev;                      // -0.5*2*N_prev
                             else                                            a_mul_n_fractional_reg <= n_prev;                       // 0.5*2*N_prev
                         end
                         2'b11: begin
-                            if(a_prev[A_DW_INTEGER+DW_FRACTIONAL] == 1'b1)  a_mul_n_fractional_reg <= (n_prev >> 1);               // 0.25*2*N_prev
+                            if(a_prev[A_DW_INTEGER+DW_FRACTIONAL] == 1'b1)  a_mul_n_fractional_reg <= -(n_prev >> 1);               // -0.25*2*N_prev
                             else                                            a_mul_n_fractional_reg <= n_prev + (n_prev >> 1);       // 0.75*2*N_prev
                         end  
                     endcase
