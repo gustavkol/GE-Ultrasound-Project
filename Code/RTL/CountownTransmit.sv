@@ -25,7 +25,7 @@ module CountdownTransmit  #(
             assign txArray[i] = delayArray[i][N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:DW_FRACTION_INCANDCOMPARE-2] == counter[N_DW_INTEGER+3:1] ? (state == TRANSMIT) : 1'b0;
         end
     endgenerate
-    assign done     = (counter[N_DW_INTEGER+3:1] == maxValue[N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:DW_FRACTION_INCANDCOMPARE-2]);
+    assign done     = state == TRANSMIT && (counter[N_DW_INTEGER+3:1] == maxValue[N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:DW_FRACTION_INCANDCOMPARE-2]);
 
 
     // Locking next state

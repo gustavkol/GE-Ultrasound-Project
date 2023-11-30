@@ -77,6 +77,7 @@ module Transmitter #(
     logic       reference_ready;
     logic       initiate_calc;
     logic       initiate_calc_reg;
+    logic       rst_refCalculator;
     // increment and compare
     logic       initiate_incrementAndCompare;
     logic       ack_incrementAndCompare;
@@ -98,10 +99,11 @@ module Transmitter #(
     assign delay_ready                      = delay_ready_neg_n && delay_ready_pos_n;
     assign incrementAndCompare_available    = incrementAndCompare_available_neg_n && incrementAndCompare_available_pos_n;
 
-    assign final_scanpoint                  = (point_counter == num_points_reg) ? 1'b1 : 1'b0;
+    assign final_scanpoint                  = (point_counter == num_points_reg && state == TRANSMIT) ? 1'b1 : 1'b0;
     assign done                             = transmit_done && final_scanpoint;
+    assign rst_refCalculator                = rst || done;
 
-    assign initiate_calc                    = initiate || initiate_calc_reg;
+    assign initiate_calc                    = (state == IDLE && initiate) || initiate_calc_reg;
     assign r_0_calc                         = (state == LOAD) ? r_0 : r_0_reg;
     assign angle_calc                       = (state == LOAD) ? angle : angle_reg;
 
@@ -156,6 +158,8 @@ module Transmitter #(
             initiate_calc_reg               <= '0;
             angle_reg                       <= '0;
             r_0_reg                         <= '0;
+            num_points_reg                  <= '0;
+            n_0_reg                         <= '0;
             for (int i = 0; i < 64; i = i + 1) begin
                 delayArray[i] = '0;
             end
@@ -187,6 +191,8 @@ module Transmitter #(
                     initiate_calc_reg               <= '0;
                     angle_reg                       <= '0;
                     r_0_reg                         <= '0;
+                    num_points_reg                  <= '0;
+                    n_0_reg                         <= '0;
                     for (int i = 0; i < 64; i = i + 1) begin
                         delayArray[i] = '0;
                     end
@@ -281,15 +287,14 @@ module Transmitter #(
                     delayMax            <= n_0_reg + signed'(6'b010000);
                     n_0_reg             <= n_0_reg + signed'(6'b010000);
                     element_counter     <= 5'd1;
+                    initiate_calc_reg   <= 1'b0;
                     if(point_counter[5:0] == 5'b10000)
                         r_0_reg         <= r_0_reg + 1;
                 end
                 TRANSMIT: begin
                     initiate_transmit   <= 1'b0;
-                    if (initiate_calc_reg == 0)
+                    if (transmit_done && ~final_scanpoint)
                         initiate_calc_reg   <= 1'b1;
-                    else
-                        initiate_calc_reg   <= 1'b0;
                 end
 
             endcase
@@ -307,7 +312,7 @@ module Transmitter #(
         .DW_INPUT(8)
     ) calcElement (
         .clk(clk),
-        .rst(rst),
+        .rst(rst_refCalculator),
 
         .initiate(initiate_calc),
         .ack(reference_ack),
