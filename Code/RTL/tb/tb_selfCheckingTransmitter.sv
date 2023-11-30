@@ -19,25 +19,26 @@ module tb_Transmitter;
     localparam NUM_INPUTS                                   = 5;
     localparam [DW_INPUT-1:0] R_0_INPUT_VECTOR    [NUM_INPUTS-1:0]  = {{8'd30},{8'd50},{8'd70},{8'd90},{8'd110}};
     localparam [ANGLE_DW-1:0] ANGLE_INPUT_VECTOR  [NUM_INPUTS-1:0]  = {{8'd70},{8'd110},{8'd50},{8'd130},{8'd90}};
-    real R_0_REAL  [NUM_INPUTS-1:0]                       = {30,50,70,90,110};
+    real R_0_REAL  [NUM_INPUTS-1:0]                       = {30.0*10**-3.0,50.0*10**-3.0,70.0*10**-3.0,90.0*10**-3.0,110.0*10**-3.0};
     real ANGLE_REAL [NUM_INPUTS-1:0]                       = {70,110,50,130,90};
     
     // Reference values
-    real                            reference_delay;
+    real                            reference_delay, diff;
 
     typedef enum {LOAD, NEXT_ELEMENT_CALC, LOAD_NEXT, TRANSMIT, IDLE} states;
     states transmit = TRANSMIT;
 
-
-    localparam  F_S             = 25*10^6;
+    localparam  PI              = 3.14159;
+    localparam  F_S             = 25*10**6.0;
     localparam  V_S             = 1540;
-    localparam  P               = 250*10^-6;
+    localparam  PITCH           = 250*10**-6.0;
     localparam  DELTA_L         = V_S/F_S;
-    localparam  SF              = 2**-4;
+    localparam  SF              = 2.0**-4.0;
 
-    integer                         point_index;
-    integer                         scanline_index;
-    integer                         cur_index;
+    integer                      scanline_index;
+    integer                      num_assertions;
+    real                         point_index;
+    real                         cur_index;
 
 
 
@@ -49,7 +50,7 @@ module tb_Transmitter;
     // Stimuli
     initial begin
         clk = 0; rst = 1; initiate = 0; r_0 = 0; angle = 0;
-        num_points = 0; point_index = 0; scanline_index = 0; cur_index = 0;
+        num_points = 0; point_index = 0.0; scanline_index = 0; cur_index = 0.0; num_assertions = 0;
 
         #40 rst         = 0;
 
@@ -79,14 +80,19 @@ module tb_Transmitter;
     end
 
     always @(posedge clk) begin
-        if (rst != 0)
+        if (~rst)
             if (transmitter_instance.state == transmit && $past(transmitter_instance.state) != transmit) begin
                 for (int n = 0; n < 64; n++) begin      // Calculating and comparing reference delay
-                    cur_index   = n - 31;
-                    reference_delay = (cur_index*P)**2 - 2*cur_index*P*(R_0_REAL[scanline_index] + point_index * DELTA_L) * $cos(ANGLE_REAL[scanline_index]) + (R_0_REAL[scanline_index] + point_index * DELTA_L)**2;
-                    assert (reference_delay > (SF*transmitter_instance.delayArray[n]) + 1 || reference_delay < (SF*transmitter_instance.delayArray[n]) - 1) $display ("Over 1 error in delay");
+                    cur_index   = n - 31.0;
+                    reference_delay = (F_S / V_S) * $sqrt( (cur_index * PITCH)**2.0 - 2.0*cur_index*PITCH*(R_0_REAL[scanline_index] + point_index * DELTA_L) * $cos(ANGLE_REAL[scanline_index] * PI / 180.0) + (R_0_REAL[scanline_index] + point_index * DELTA_L)**2.0);
+                    assert (reference_delay + 1.0 > SF*transmitter_instance.delayArray[n] && reference_delay - 1.0 < SF*transmitter_instance.delayArray[n]) 
+                        else begin 
+                            $display ("Over 1 error in delay %f , %f", SF*transmitter_instance.delayArray[n], reference_delay);
+                            num_assertions++;
+                        end
+
                 end
-                point_index++;
+                point_index = point_index + 1.0;
             end
     end
 
