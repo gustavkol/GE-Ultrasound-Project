@@ -26,18 +26,20 @@ module CordicCosine # (
     logic                                               done_reg;
     logic [3:0]                                         counter;
 
-    localparam signed [6+6:0] ROTATED_ANGLE_ARRAY [8:0] = {      // rotated angle for each iteration
-        {13'b0000000_010000},          // 0.25
-        {13'b0000000_011100},          // 0.4375
-        {13'b0000000_111000},          // 0.875
-        {13'b0000001_110000},          // 1.75
-        {13'b0000011_100100},          // 3.5625
-        {13'b0000111_001000},          // 7.125
-        {13'b0001110_001000},          // 14.125
-        {13'b0011010_100100},          // 26.5625
+    localparam signed [6+6:0] ROTATED_ANGLE_ARRAY [10:0] = {      // rotated angle for each iteration
+        {13'b0000000_000011},           // 0.05595
+        {13'b0000000_000111},           // 0.109375
+        {13'b0000000_010000},           // 0.25
+        {13'b0000000_011100},           // 0.4375
+        {13'b0000000_111000},           // 0.875
+        {13'b0000001_110000},           // 1.75
+        {13'b0000011_100100},           // 3.5625
+        {13'b0000111_001000},           // 7.125    --
+        {13'b0001110_001000},           // 14.125
+        {13'b0011010_100100},           // 26.5625
         {13'b0101101_000000}            // 45
     };
-    localparam [3:0] num_iterations = 4'd9;
+    localparam [3:0] num_iterations = 4'd11;
 
     logic signed [DW_ANGLE+DW_FRACTION+1:0] next_angle;
     assign next_angle = (sign_increment == 1'b0) ? angle_cur_reg - ROTATED_ANGLE_ARRAY[counter]  :   angle_cur_reg + ROTATED_ANGLE_ARRAY[counter];
@@ -93,7 +95,7 @@ module CordicCosine # (
                 end
                 LOAD: begin
                     x_cur_reg       <= (x_scale >> 1) + (x_scale >> 4) + (x_scale >> 5) + (x_scale >> 6);               // K_n = 0.6088 ~ 0.609375 = 2^-1 + 2^-4 + 2^-5 + 2^-6
-                    if (angle >= 90) begin
+                    if (angle > 90) begin
                         angle_cur_reg   <= {180 - angle, 6'b0000};
                         sign_bit        <= 1'b1;
                     end
@@ -105,7 +107,6 @@ module CordicCosine # (
                 RUN: begin
                     if (counter == num_iterations-1'b1) begin
                         done_reg        <= 1'b1;
-                        x_cur_reg       <= (sign_increment == 1'b0) ? (x_cur_reg - (y_cur_reg >>> counter)) : (x_cur_reg + (y_cur_reg >>> counter));
                     end
                     else if (done_reg == 1'b0) begin
                         if (sign_increment == 1'b0) begin   // +

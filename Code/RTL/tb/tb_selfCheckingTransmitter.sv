@@ -16,14 +16,15 @@ module tb_Transmitter;
     wire                            done;
 
     // Input generation and vectors
-    localparam NUM_INPUTS                                   = 5;
-    localparam [DW_INPUT-1:0] R_0_INPUT_VECTOR    [NUM_INPUTS-1:0]  = {{8'd30},{8'd50},{8'd70},{8'd90},{8'd110}};
-    localparam [ANGLE_DW-1:0] ANGLE_INPUT_VECTOR  [NUM_INPUTS-1:0]  = {{8'd70},{8'd110},{8'd50},{8'd130},{8'd90}};
-    real R_0_REAL  [NUM_INPUTS-1:0]                       = {30.0*10**-3.0,50.0*10**-3.0,70.0*10**-3.0,90.0*10**-3.0,110.0*10**-3.0};
-    real ANGLE_REAL [NUM_INPUTS-1:0]                       = {70,110,50,130,90};
+    localparam NUM_INPUTS                                               = 5;
+    localparam [DW_INPUT-1:0]   R_0_INPUT_VECTOR    [NUM_INPUTS-1:0]    = {{8'd70},{8'd90},{8'd30},{8'd50},{8'd110}};
+    localparam [ANGLE_DW-1:0]   ANGLE_INPUT_VECTOR  [NUM_INPUTS-1:0]    = {{8'd50},{8'd130},{8'd70},{8'd110},{8'd90}};
+    localparam [12:0]           NUM_POINTS_VECTOR   [NUM_INPUTS-1:0]    = {{13'd2990},{13'd2650},{13'd3600},{13'd3300},{13'd2300}};
+    // Reference
+    real R_0_REAL  [NUM_INPUTS-1:0]                                 = {70.0*10**-3.0,90.0*10**-3.0,30.0*10**-3.0,50.0*10**-3.0,110.0*10**-3.0};
+    real ANGLE_REAL [NUM_INPUTS-1:0]                                = {50,130,70,110,90};
     
-    // Reference values
-    real                            reference_delay, diff;
+
 
     typedef enum {LOAD, NEXT_ELEMENT_CALC, LOAD_NEXT, TRANSMIT, IDLE} states;
     states transmit = TRANSMIT;
@@ -34,11 +35,17 @@ module tb_Transmitter;
     localparam  PITCH           = 250*10**-6.0;
     localparam  DELTA_L         = V_S/F_S;
     localparam  SF              = 2.0**-4.0;
+    localparam  N0_INDEX        = 31;
 
-    integer                      scanline_index;
-    integer                      num_assertions;
-    real                         point_index;
-    real                         cur_index;
+    // Reference values
+    real                reference_delay, diff;
+    real                n_0_theoretic, diff_theoretic;
+    real                n_0_hw, diff_hw;
+
+    integer             scanline_index;
+    integer             num_assertions;
+    real                point_index;
+    real                cur_index;
 
 
 
@@ -56,12 +63,12 @@ module tb_Transmitter;
 
         #20
         for (int i = 0; i < NUM_INPUTS; i++) begin
-            angle        = ANGLE_INPUT_VECTOR[i];
-            r_0          = R_0_INPUT_VECTOR[i];
-            num_points   = 13'd3;
-            #70 initiate     = 1;
-            #10 initiate     = 0;
-            wait(done == 1'b1);
+            angle           = ANGLE_INPUT_VECTOR[i];
+            r_0             = R_0_INPUT_VECTOR[i];
+            num_points      = NUM_POINTS_VECTOR[i];
+            #70 initiate    = 1;
+            #10 initiate    = 0;
+            wait    (done == 1'b1);
         end
     end
 
@@ -82,12 +89,17 @@ module tb_Transmitter;
     always @(posedge clk) begin
         if (~rst)
             if (transmitter_instance.state == transmit && $past(transmitter_instance.state) != transmit) begin
+                n_0_theoretic   = (F_S / V_S) * (R_0_REAL[scanline_index] + point_index * DELTA_L);
+                n_0_hw          = SF*transmitter_instance.delayArray[N0_INDEX];
                 for (int n = 0; n < 64; n++) begin      // Calculating and comparing reference delay
-                    cur_index   = n - 31.0;
+                    cur_index       = n - 31.0;
                     reference_delay = (F_S / V_S) * $sqrt( (cur_index * PITCH)**2.0 - 2.0*cur_index*PITCH*(R_0_REAL[scanline_index] + point_index * DELTA_L) * $cos(ANGLE_REAL[scanline_index] * PI / 180.0) + (R_0_REAL[scanline_index] + point_index * DELTA_L)**2.0);
-                    assert (reference_delay + 1.0 > SF*transmitter_instance.delayArray[n] && reference_delay - 1.0 < SF*transmitter_instance.delayArray[n]) 
+                    diff_theoretic  = reference_delay - n_0_theoretic;
+                    diff_hw         = SF*transmitter_instance.delayArray[n] - n_0_hw;
+                    
+                    assert (diff_theoretic - diff_hw < 0.5) 
                         else begin 
-                            $display ("Over 1 error in delay %f , %f", SF*transmitter_instance.delayArray[n], reference_delay);
+                            $display ("Over 0.5 error in delay cycles: (error: %f, R_0 = %f, angle = %f, n = %f, point = %f)", diff_hw - diff_theoretic, R_0_REAL[scanline_index], ANGLE_REAL[scanline_index], cur_index, point_index);
                             num_assertions++;
                         end
 

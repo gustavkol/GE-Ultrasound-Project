@@ -26,8 +26,8 @@ module Transmitter #(
     logic [N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                    delayMin;                       // Holding smallest delay value
     logic [N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                    delayMax;                       // Holding largest delay value
     logic [N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                    n_0_reg;                        // Holding value for element n=0
-    logic [DW_INPUT-1:0]                                                r_0_reg;
-    logic [DW_INPUT-1:0]                                                r_0_calc;
+    logic [DW_INPUT+DW_FRACTION_INCANDCOMPARE-1:0]                      r_0_reg;
+    logic [DW_INPUT+DW_FRACTION_INCANDCOMPARE-1:0]                      r_0_calc;
     logic [ANGLE_DW-1:0]                                                angle_reg;
     logic [ANGLE_DW-1:0]                                                angle_calc;
 
@@ -69,6 +69,7 @@ module Transmitter #(
     // ** Control signals ** //
     logic [5:0]     element_counter;
     logic [12:0]    point_counter;
+    logic           point_counter_prev_index_7;
     logic [12:0]    num_points_reg;
     logic           final_scanpoint;
     // reference calculator
@@ -104,7 +105,7 @@ module Transmitter #(
     assign rst_refCalculator                = rst || done;
 
     assign initiate_calc                    = (state == IDLE && initiate) || initiate_calc_reg;
-    assign r_0_calc                         = (state == LOAD) ? r_0 : r_0_reg;
+    assign r_0_calc                         = (state == LOAD) ? {r_0,4'd0} : r_0_reg;
     assign angle_calc                       = (state == LOAD) ? angle : angle_reg;
 
     // Locking next state
@@ -160,6 +161,7 @@ module Transmitter #(
             r_0_reg                         <= '0;
             num_points_reg                  <= '0;
             n_0_reg                         <= '0;
+            point_counter_prev_index_7      <= '0;
             for (int i = 0; i < 64; i = i + 1) begin
                 delayArray[i] = '0;
             end
@@ -193,6 +195,7 @@ module Transmitter #(
                     r_0_reg                         <= '0;
                     num_points_reg                  <= '0;
                     n_0_reg                         <= '0;
+                    point_counter_prev_index_7      <= 1'b1;
                     for (int i = 0; i < 64; i = i + 1) begin
                         delayArray[i] = '0;
                     end
@@ -204,7 +207,7 @@ module Transmitter #(
                     delayMin            <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);
                     delayMax            <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);
                     n_0_reg             <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);
-                    r_0_reg             <= r_0;
+                    r_0_reg             <= {r_0,4'd0};
                     angle_reg           <= angle;
                     num_points_reg      <= num_points;
                     element_counter     <= 5'd1;
@@ -288,8 +291,12 @@ module Transmitter #(
                     n_0_reg             <= n_0_reg + signed'(6'b010000);
                     element_counter     <= 5'd1;
                     initiate_calc_reg   <= 1'b0;
-                    if(point_counter[5:0] == 5'b10000)
-                        r_0_reg         <= r_0_reg + 1;
+                    if (point_counter[7] == point_counter_prev_index_7 && point_counter[3:1] == 3'b101) begin // Correction of quantized error (2^6+2^2+2 = 69 approx 69.44)
+                        point_counter_prev_index_7      <= ~point_counter[7];
+                        r_0_reg                         <= r_0_reg - 5'b0_0001;
+                    end
+                    else
+                        r_0_reg                         <= r_0_reg + 5'b0_0001;
                 end
                 TRANSMIT: begin
                     initiate_transmit   <= 1'b0;

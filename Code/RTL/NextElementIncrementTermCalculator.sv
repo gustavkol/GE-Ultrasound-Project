@@ -10,7 +10,7 @@ module NextElementIncrementTermCalculator  #(
                             // Input values
                             input                                                   initiate,           // Initiates a new delay caclulation for all n, locks input values
                             input                                                   ack,                // Acknowledges output has been read
-                            input [DW_INPUT-1:0]                                    r_0,                // R_0 input
+                            input [DW_INPUT+4-1:0]                                  r_0,                // R_0 input
                             input [ANGLE_DW-1:0]                                    angle,              // angle input
                             // Output values
                             output signed   [DW_INTEGER+DW_FRACTION:0]              output_term_pos_n,  // Output comparator term (K_n)
@@ -102,7 +102,7 @@ module NextElementIncrementTermCalculator  #(
                 end
                 LOAD: begin // CONST MULTIPLIER
                     // NOTE: CAN BE DONE ITERATIVELY USING A SINGLE 2-ADDER
-                    cordic_x_scale      <= (r_0 << 7+6) + (r_0 << 1+6) + (r_0 << 6) + (r_0 << 6-1) + (r_0 << 6-2) + (r_0 << 6-6) + (r_0 >>> 9-6);     // (2*p*(f_s/v_s)^2) * 10^-3 = 131.767
+                    cordic_x_scale      <= (r_0 << 7+(6-4)) + (r_0 << 1+(6-4)) + (r_0 << (6-4)) + (r_0 << (6-4)-1) + (r_0 << (6-4)-2) + (r_0 >> 6-(6-4)) + (r_0 >>> 9-(6-4));     // (2*p*(f_s/v_s)^2) * 10^-3 = 131.767
                     angle_reg           <= angle;
                     cordic_initiate     <= 1'b1;
                 end
