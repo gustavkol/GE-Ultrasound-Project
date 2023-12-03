@@ -1,77 +1,88 @@
 module Transmitter #(
-                    parameter DW_INTEGER                = 18,
                     parameter DW_INPUT                  = 8,
-                    parameter DW_FRACTION               = 8,
-                    parameter ANGLE_DW                  = 8,
-                    parameter INC_TERM_DW_INTEGER       = 16,
-                    parameter N_DW_INTEGER              = 13,
-                    parameter ERROR_DW_INTEGER          = 14,
-                    parameter A_DW_INTEGER              = 4,
-                    parameter DW_FRACTION_INCANDCOMPARE = 4
+                    parameter DW_ANGLE                  = 8,
+                    parameter DW_SCANLINE_COUNT         = 13,
+                    parameter NUM_ELEMENTS              = 64
                     )(
                     input                                       clk,                // Clock signal
                     input                                       rst,                // Reset signal
                     // Input values
                     input                                       initiate,           // Initiates calculation for next scan point in scanline
                     input [DW_INPUT-1:0]                        r_0,                // R_0 input
-                    input [ANGLE_DW-1:0]                        angle,              // angle input
-                    input [12:0]                                num_points,         // Number of points in scanline
+                    input [DW_ANGLE-1:0]                        angle,              // angle input
+                    input [DW_SCANLINE_COUNT-1:0]               num_points,         // Number of points in scanline
                     // Output values
-                    output [63:0]                               txArray,            // Transmit signal for each element
-                    output                                      done                // Transmittion for scanline done signal
+                    output [NUM_ELEMENTS-1:0]                   txArray,            // Transmit signal for each element
+                    output                                      done                // Transmission for complete scanline done signal
                     );
 
+    // Calculator parameters
+    localparam DW_CALC_INTEGER              = 18;
+    localparam DW_CALC_FRACTION             = 6;
+    
+    // IncrementAndCompare parameters
+    localparam DW_INC_TERM_INTEGER          = 16;
+    localparam DW_N_INTEGER                 = 13;
+    localparam DW_ERROR_INTEGER             = 14;
+    localparam DW_A_INTEGER                 = 4;
+    localparam DW_FRACTION_INCANDCOMPARE    = 4;
+
+    // General parameters
+    localparam DW_ELEMENT_COUNTER           = 6;
+    localparam DW_POINT_COUNTER             = 13;
+    localparam HALF_ELEMENTS                = NUM_ELEMENTS/2;
+
     // Delay values
-    logic [N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                    delayArray[63:0];               // Array holding all delay values
-    logic [N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                    delayMin;                       // Holding smallest delay value
-    logic [N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                    delayMax;                       // Holding largest delay value
-    logic [N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                    n_0_reg;                        // Holding value for element n=0
-    logic [DW_INPUT+DW_FRACTION_INCANDCOMPARE-1:0]                      r_0_reg;
-    logic [DW_INPUT+DW_FRACTION_INCANDCOMPARE-1:0]                      r_0_calc;
-    logic [ANGLE_DW-1:0]                                                angle_reg;
-    logic [ANGLE_DW-1:0]                                                angle_calc;
+    logic [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]    delayArray  [NUM_ELEMENTS-1:0]; // Array holding all delay values
+    logic [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]    delayMin;                       // Holding smallest delay value
+    logic [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]    delayMax;                       // Holding largest delay value
+    logic [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]    n_0_reg;                        // Holding value for element n=0
+    logic [DW_INPUT+DW_FRACTION_INCANDCOMPARE-1:0]      r_0_reg;
+    logic [DW_INPUT+DW_FRACTION_INCANDCOMPARE-1:0]      r_0_calc;
+    logic [DW_ANGLE-1:0]                                angle_reg;
+    logic [DW_ANGLE-1:0]                                angle_calc;
 
     // NextElementIncrementTermCalculator inputs and outputs
-    logic signed [DW_FRACTION+DW_INTEGER-2:0]                           reference_output_term_pos_n;
-    logic signed [DW_FRACTION+DW_INTEGER-2:0]                           reference_output_term_neg_n;
+    logic signed [DW_CALC_FRACTION+DW_CALC_INTEGER-1:0]                     reference_output_term_pos_n;
+    logic signed [DW_CALC_FRACTION+DW_CALC_INTEGER-1:0]                     reference_output_term_neg_n;
 
     //  ** IncrementAndCompare inputs and outputs **  //
     // Positive indexed elements
-    logic [N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                    n_prev_pos_n;
-    logic signed [A_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]             a_prev_pos_n;
-    logic [2*A_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                  a_prev_sq_pos_n;
-    logic signed [INC_TERM_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]      comp_term_pos_n;
-    logic signed [INC_TERM_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]      comp_term_prev_pos_n;
-    logic signed [ERROR_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]         error_prev_pos_n;
+    logic           [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]              n_prev_pos_n;
+    logic signed    [DW_A_INTEGER+DW_FRACTION_INCANDCOMPARE:0]              a_prev_pos_n;
+    logic           [2*DW_A_INTEGER+DW_FRACTION_INCANDCOMPARE:0]            a_prev_sq_pos_n;
+    logic signed    [DW_INC_TERM_INTEGER+DW_FRACTION_INCANDCOMPARE:0]       comp_term_pos_n;
+    logic signed    [DW_INC_TERM_INTEGER+DW_FRACTION_INCANDCOMPARE:0]       comp_term_prev_pos_n;
+    logic signed    [DW_ERROR_INTEGER+DW_FRACTION_INCANDCOMPARE:0]          error_prev_pos_n;
 
-    logic [N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                    n_next_pos_n;
-    logic signed [A_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]             a_next_pos_n;
-    logic [2*A_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                  a_next_sq_pos_n;
-    logic signed  [INC_TERM_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]     comp_term_next_pos_n;
-    logic signed  [ERROR_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]        error_next_pos_n;
+    logic           [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]              n_next_pos_n;
+    logic signed    [DW_A_INTEGER+DW_FRACTION_INCANDCOMPARE:0]              a_next_pos_n;
+    logic           [2*DW_A_INTEGER+DW_FRACTION_INCANDCOMPARE:0]            a_next_sq_pos_n;
+    logic signed    [DW_INC_TERM_INTEGER+DW_FRACTION_INCANDCOMPARE:0]       comp_term_next_pos_n;
+    logic signed    [DW_ERROR_INTEGER+DW_FRACTION_INCANDCOMPARE:0]          error_next_pos_n;
 
     // Negative indexed elements
-    logic [N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                    n_prev_neg_n;
-    logic signed [A_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]             a_prev_neg_n;
-    logic [2*A_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                  a_prev_sq_neg_n;
-    logic signed [INC_TERM_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]      comp_term_neg_n;
-    logic signed [INC_TERM_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]      comp_term_prev_neg_n;
-    logic signed [ERROR_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]         error_prev_neg_n;
+    logic           [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]              n_prev_neg_n;
+    logic signed    [DW_A_INTEGER+DW_FRACTION_INCANDCOMPARE:0]              a_prev_neg_n;
+    logic           [2*DW_A_INTEGER+DW_FRACTION_INCANDCOMPARE:0]            a_prev_sq_neg_n;
+    logic signed    [DW_INC_TERM_INTEGER+DW_FRACTION_INCANDCOMPARE:0]       comp_term_neg_n;
+    logic signed    [DW_INC_TERM_INTEGER+DW_FRACTION_INCANDCOMPARE:0]       comp_term_prev_neg_n;
+    logic signed    [DW_ERROR_INTEGER+DW_FRACTION_INCANDCOMPARE:0]          error_prev_neg_n;
 
-    logic [N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                    n_next_neg_n;
-    logic signed [A_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]             a_next_neg_n;
-    logic [2*A_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                  a_next_sq_neg_n;
-    logic signed  [INC_TERM_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]     comp_term_next_neg_n;
-    logic signed  [ERROR_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0]        error_next_neg_n;
+    logic           [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]              n_next_neg_n;
+    logic signed    [DW_A_INTEGER+DW_FRACTION_INCANDCOMPARE:0]              a_next_neg_n;
+    logic           [2*DW_A_INTEGER+DW_FRACTION_INCANDCOMPARE:0]            a_next_sq_neg_n;
+    logic signed    [DW_INC_TERM_INTEGER+DW_FRACTION_INCANDCOMPARE:0]       comp_term_next_neg_n;
+    logic signed    [DW_ERROR_INTEGER+DW_FRACTION_INCANDCOMPARE:0]          error_next_neg_n;
 
     
 
     // ** Control signals ** //
-    logic [5:0]     element_counter;
-    logic [12:0]    point_counter;
-    logic           point_counter_prev_index_7;
-    logic [12:0]    num_points_reg;
-    logic           final_scanpoint;
+    logic [DW_ELEMENT_COUNTER-1:0]  element_counter;
+    logic [DW_POINT_COUNTER-1:0]    point_counter;
+    logic                           point_counter_prev_index_7;
+    logic [DW_POINT_COUNTER-1:0]    num_points_reg;
+    logic                           final_scanpoint;
     // reference calculator
     logic       reference_ack;
     logic       reference_calculation_done;
@@ -135,7 +146,6 @@ module Transmitter #(
     // System functionality
     always @(posedge clk) begin
         if (rst) begin
-            //delayArray              <= '0;
             delayMin                        <= '0;
             delayMax                        <= '0;
             reference_ack                   <= '0;
@@ -162,14 +172,13 @@ module Transmitter #(
             num_points_reg                  <= '0;
             n_0_reg                         <= '0;
             point_counter_prev_index_7      <= '0;
-            for (int i = 0; i < 64; i = i + 1) begin
+            for (int i = 0; i < NUM_ELEMENTS; i = i + 1) begin
                 delayArray[i] = '0;
             end
         end
         else begin
             case(state)
                 IDLE: begin     // RESET ALL VALUES
-                    //delayArray              <= '0;
                     delayMin                        <= '0;
                     delayMax                        <= '0;
                     reference_ack                   <= '0;
@@ -196,21 +205,21 @@ module Transmitter #(
                     num_points_reg                  <= '0;
                     n_0_reg                         <= '0;
                     point_counter_prev_index_7      <= 1'b1;
-                    for (int i = 0; i < 64; i = i + 1) begin
+                    for (int i = 0; i < NUM_ELEMENTS; i = i + 1) begin
                         delayArray[i] = '0;
                     end
                 end
                 LOAD: begin // CONST MULTIPLIER
-                    n_prev_pos_n        <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);  // N_{0,0} = f_s/v_s * R_0 = 16.234375 * R_0
-                    n_prev_neg_n        <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);
-                    delayArray[31]      <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);
-                    delayMin            <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);
-                    delayMax            <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);
-                    n_0_reg             <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);
-                    r_0_reg             <= {r_0,4'd0};
-                    angle_reg           <= angle;
-                    num_points_reg      <= num_points;
-                    element_counter     <= 5'd1;
+                    n_prev_pos_n                <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);  // N_{0,0} = f_s/v_s * R_0 = 16.234375 * R_0
+                    n_prev_neg_n                <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);
+                    delayArray[HALF_ELEMENTS-1] <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);
+                    delayMin                    <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);
+                    delayMax                    <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);
+                    n_0_reg                     <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);
+                    r_0_reg                     <= {r_0,4'd0};
+                    angle_reg                   <= angle;
+                    num_points_reg              <= num_points;
+                    element_counter             <= 1;
                 end
                 NEXT_ELEMENT_CALC: begin
                     initiate_transmit                   <= 1'b0;
@@ -229,19 +238,19 @@ module Transmitter #(
                     // When IncrementAndCompare is done
                     if (delay_ready && ack_incrementAndCompare == 1'b0) begin
                         // Storing delay value
-                        delayArray[31+element_counter]  <= n_next_pos_n;
-                        if (element_counter < 32)
-                            delayArray[31-element_counter]  <= n_next_neg_n;
+                        delayArray[HALF_ELEMENTS-1+element_counter]  <= n_next_pos_n;
+                        if (element_counter < HALF_ELEMENTS)
+                            delayArray[HALF_ELEMENTS-1-element_counter]  <= n_next_neg_n;
 
                         if (n_next_pos_n < delayMin || n_next_neg_n < delayMin)
                             if (n_next_pos_n < n_next_neg_n)
                                 delayMin            <= n_next_pos_n;
-                            else if (element_counter < 32)
+                            else if (element_counter < HALF_ELEMENTS)
                                 delayMin            <= n_next_neg_n;
                         if (n_next_pos_n > delayMax || n_next_neg_n > delayMax)
                             if (n_next_pos_n > n_next_neg_n)
                                 delayMax            <= n_next_pos_n;
-                            else if (element_counter < 32)
+                            else if (element_counter < HALF_ELEMENTS)
                                 delayMax            <= n_next_neg_n;
                         // Feedback to IncrementAndCompare
                         n_prev_pos_n                  <= n_next_pos_n;
@@ -260,7 +269,7 @@ module Transmitter #(
                         reference_ack           <= 1'b1;
                         if (reference_calculation_done == 1'b1) begin
                             initiate_transmit               <= 1'b1;
-                            element_counter                 <= 5'd0;
+                            element_counter                 <= '0;
                             point_counter                   <= point_counter + 1;
                             n_prev_pos_n                    <= '0;
                             a_prev_pos_n                    <= '0;
@@ -289,7 +298,7 @@ module Transmitter #(
                     delayMin            <= n_0_reg + signed'(6'b010000);
                     delayMax            <= n_0_reg + signed'(6'b010000);
                     n_0_reg             <= n_0_reg + signed'(6'b010000);
-                    element_counter     <= 5'd1;
+                    element_counter     <= 1;
                     initiate_calc_reg   <= 1'b0;
                     if (point_counter[7] == point_counter_prev_index_7 && point_counter[3:1] == 3'b101) begin // Correction of quantized error (2^6+2^2+2 = 69 approx 69.44)
                         point_counter_prev_index_7      <= ~point_counter[7];
@@ -313,19 +322,19 @@ module Transmitter #(
 
     // Instantiating the reference calculator module
     NextElementIncrementTermCalculator #(
-        .DW_INTEGER(18),
-		.DW_FRACTION(6),
-        .ANGLE_DW(8),
-        .DW_INPUT(8)
+        .DW_INTEGER(DW_CALC_INTEGER),
+		.DW_FRACTION(DW_CALC_FRACTION),
+        .DW_ANGLE(DW_ANGLE),
+        .DW_INPUT(DW_INPUT)
     ) calcElement (
         .clk(clk),
         .rst(rst_refCalculator),
-
+        // Input
         .initiate(initiate_calc),
         .ack(reference_ack),
         .r_0(r_0_calc),
         .angle(angle_calc),
-
+        // Output
         .output_term_pos_n(reference_output_term_pos_n),
         .output_term_neg_n(reference_output_term_neg_n),
         .last_element(reference_calculation_done),
@@ -334,12 +343,11 @@ module Transmitter #(
 
     // Instantiating the incrementAndCompare module
     IncrementAndCompare #(
-        .STEP_SIZE(1),
-        .INC_TERM_DW_INTEGER(16),
-        .N_DW_INTEGER(13),
-        .ERROR_DW_INTEGER(14),
-        .A_DW_INTEGER(4),
-        .DW_FRACTIONAL(DW_FRACTION_INCANDCOMPARE)
+        .DW_INC_TERM_INTEGER(DW_INC_TERM_INTEGER),
+        .DW_N_INTEGER(DW_N_INTEGER),
+        .DW_ERROR_INTEGER(DW_ERROR_INTEGER),
+        .DW_A_INTEGER(DW_A_INTEGER),
+        .DW_FRACTION(DW_FRACTION_INCANDCOMPARE)
     ) incAndComp_pos_n (
         .clk(clk),
         .rst(rst),
@@ -364,12 +372,11 @@ module Transmitter #(
 
         // Instantiating the incrementAndCompare module
     IncrementAndCompare #(
-        .STEP_SIZE(1),
-        .INC_TERM_DW_INTEGER(16),
-        .N_DW_INTEGER(13),
-        .ERROR_DW_INTEGER(14),
-        .A_DW_INTEGER(4),
-        .DW_FRACTIONAL(DW_FRACTION_INCANDCOMPARE)
+        .DW_INC_TERM_INTEGER(DW_INC_TERM_INTEGER),
+        .DW_N_INTEGER(DW_N_INTEGER),
+        .DW_ERROR_INTEGER(DW_ERROR_INTEGER),
+        .DW_A_INTEGER(DW_A_INTEGER),
+        .DW_FRACTION(DW_FRACTION_INCANDCOMPARE)
     ) incAndComp_neg_n (
         .clk(clk),
         .rst(rst),
@@ -393,7 +400,7 @@ module Transmitter #(
     );
 
     CountdownTransmit  #(
-        .N_DW_INTEGER(N_DW_INTEGER),
+        .DW_N_INTEGER(DW_N_INTEGER),
         .DW_FRACTION_INCANDCOMPARE(DW_FRACTION_INCANDCOMPARE)                        
     ) inst_countdown(
         .clk(clk),

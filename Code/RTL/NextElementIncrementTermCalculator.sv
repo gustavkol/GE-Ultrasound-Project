@@ -2,8 +2,9 @@
 module NextElementIncrementTermCalculator  #(
                             parameter DW_INTEGER    = 18,
                             parameter DW_INPUT      = 8,
+                            parameter NUM_ELEMENTS  = 64,
                             parameter DW_FRACTION   = 6,
-                            parameter ANGLE_DW      = 8
+                            parameter DW_ANGLE      = 8
                             )(
                             input                                                   clk,                // Clock signal
                             input                                                   rst,                // Reset signal
@@ -11,36 +12,38 @@ module NextElementIncrementTermCalculator  #(
                             input                                                   initiate,           // Initiates a new delay caclulation for all n, locks input values
                             input                                                   ack,                // Acknowledges output has been read
                             input [DW_INPUT+4-1:0]                                  r_0,                // R_0 input
-                            input [ANGLE_DW-1:0]                                    angle,              // angle input
+                            input [DW_ANGLE-1:0]                                    angle,              // angle input
                             // Output values
-                            output signed   [DW_INTEGER+DW_FRACTION:0]              output_term_pos_n,  // Output comparator term (K_n)
-                            output signed   [DW_INTEGER+DW_FRACTION:0]              output_term_neg_n,  // Output comparator term (K_n)
+                            output signed   [DW_INTEGER+DW_FRACTION-1:0]            output_term_pos_n,  // Output comparator term (K_n)
+                            output signed   [DW_INTEGER+DW_FRACTION-1:0]            output_term_neg_n,  // Output comparator term (K_n)
                             output                                                  last_element,
                             output                                                  ready               // Result ready signal
                             );
 
-    // Term A_0 = (f_s*p/v_s)^2 = 16.47094788 stored in memory/LUT
-    localparam [5+DW_FRACTION:0] a_0 = 12'b010000_011110; // Quantized value = 16.46875
+    localparam HALF_ELEMENTS                        = NUM_ELEMENTS/2;
+    localparam DW_CONSTANT                          = 6;
+    localparam [DW_CONSTANT+DW_FRACTION-1:0] a_0    = 'b010000_011110; // Quantized value A_0 = 16.46875
+    localparam DW_COUNTER                           = 7;
 
     // State machine variables
     enum {LOAD, RUN1, WAIT, RUN2, IDLE} state, nextState;
 
     // Registers holding results
-    logic [ANGLE_DW:0]                          angle_reg;
-    logic signed [DW_FRACTION+DW_INTEGER:0]     output_term_pos_n_reg;
-    logic signed [DW_FRACTION+DW_INTEGER:0]     output_term_neg_n_reg;
+    logic [DW_ANGLE-1:0]                                        angle_reg;
+    logic signed [DW_FRACTION+DW_INTEGER-1:0]                   output_term_pos_n_reg;
+    logic signed [DW_FRACTION+DW_INTEGER-1:0]                   output_term_neg_n_reg;
 
     // Control signals
-    logic [6:0]                         counter;
-    logic                               last_element_reg;
-    logic                               ready_reg;
+    logic [DW_COUNTER-1:0]                                      counter;
+    logic                                                       last_element_reg;
+    logic                                                       ready_reg;
 
     // Cordic signals
-    logic signed [16+DW_FRACTION:0]     cordic_result;
-    logic [DW_FRACTION+DW_INTEGER:0]    cordic_x_scale;
-    logic                               cordic_initiate;
-    logic                               cordic_ack;
-    logic                               cordic_ready;
+    logic signed [DW_INTEGER+DW_FRACTION-1:0]                   cordic_result;
+    logic [DW_FRACTION+DW_INTEGER-1:0]                          cordic_x_scale;
+    logic                                                       cordic_initiate;
+    logic                                                       cordic_ack;
+    logic                                                       cordic_ready;
 
     // Assigning outputs
     assign ready                = (state == WAIT) ? ready_reg : '0;
@@ -101,8 +104,14 @@ module NextElementIncrementTermCalculator  #(
                     cordic_ack              <= 1'b0;
                 end
                 LOAD: begin // CONST MULTIPLIER
-                    // NOTE: CAN BE DONE ITERATIVELY USING A SINGLE 2-ADDER
-                    cordic_x_scale      <= (r_0 << 7+(6-4)) + (r_0 << 1+(6-4)) + (r_0 << (6-4)) + (r_0 << (6-4)-1) + (r_0 << (6-4)-2) + (r_0 >> 6-(6-4)) + (r_0 >>> 9-(6-4));     // (2*p*(f_s/v_s)^2) * 10^-3 = 131.767
+                    // NOTE: -4 because of input fraction in area optimized solution
+                    cordic_x_scale      <= (r_0 << 7+(DW_FRACTION-4))           // (2*p*(f_s/v_s)^2) * 10^-3 = 131.767
+                                            + (r_0 << 1+(DW_FRACTION-4)) 
+                                            + (r_0 << (DW_FRACTION-4)) 
+                                            + (r_0 << (DW_FRACTION-4)-1) 
+                                            + (r_0 << (DW_FRACTION-4)-2) 
+                                            + (r_0 >> 6-(DW_FRACTION-4)) 
+                                            + (r_0 >>> 9-(DW_FRACTION-4));     
                     angle_reg           <= angle;
                     cordic_initiate     <= 1'b1;
                 end
@@ -113,7 +122,7 @@ module NextElementIncrementTermCalculator  #(
                         output_term_neg_n_reg   <= signed'(a_0) + cordic_result;      // A_0 + C_0
                         ready_reg               <= cordic_ready;
                         cordic_ack              <=  1'b1;
-                        counter                 <= 6'd1;
+                        counter                 <= {DW_COUNTER{'0}};
                     end
                 end
                 WAIT: if(ack) begin
@@ -123,7 +132,7 @@ module NextElementIncrementTermCalculator  #(
                     output_term_pos_n_reg   <= output_term_pos_n_reg + (a_0 << 1);    // A_0 * (2*n + 1) - C_0
                     output_term_neg_n_reg   <= output_term_neg_n_reg + (a_0 << 1);    // A_0 * (2*n + 1) + C_0
                     ready_reg               <= 1'b1;
-                    if (counter == 6'd32)
+                    if (counter == HALF_ELEMENTS)
                         last_element_reg    <= 1'b1;
                     else
                         counter         <= counter + 1;
@@ -134,9 +143,9 @@ module NextElementIncrementTermCalculator  #(
 
 
     CordicCosine # (
-        .DW_ANGLE(7),
-        .DW_FRACTION(6),
-        .DW_CALCULATION_TERMS(16)
+        .DW_ANGLE(DW_ANGLE),
+        .DW_FRACTION(DW_FRACTION),
+        .DW_CALCULATION_TERMS(DW_INTEGER)
     )   cordic_inst  (
         .clk(clk),
         .rst(rst),

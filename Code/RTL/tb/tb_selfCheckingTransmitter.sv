@@ -1,24 +1,23 @@
 `timescale 1 ns / 1 ps
 module tb_Transmitter;
-    parameter DW_INTEGER    = 18;
-    parameter DW_FRACTION   = 8;
-    parameter ANGLE_DW      = 8;
+    parameter DW_ANGLE      = 8;
     parameter DW_INPUT      = 8;
+    parameter NUM_ELEMENTS  = 64;
 
     // input signals
     reg                             clk, rst, initiate;
     reg [DW_INPUT-1:0]              r_0;
-    reg [ANGLE_DW-1:0]              angle;
+    reg [DW_ANGLE-1:0]              angle;
     reg [12:0]                      num_points;
 
     // output signals
-    wire [63:0]                     txArray;
+    wire [NUM_ELEMENTS-1:0]         txArray;
     wire                            done;
 
     // Input generation and vectors
     localparam NUM_INPUTS                                               = 5;
     localparam [DW_INPUT-1:0]   R_0_INPUT_VECTOR    [NUM_INPUTS-1:0]    = {{8'd70},{8'd90},{8'd30},{8'd50},{8'd110}};
-    localparam [ANGLE_DW-1:0]   ANGLE_INPUT_VECTOR  [NUM_INPUTS-1:0]    = {{8'd50},{8'd130},{8'd70},{8'd110},{8'd90}};
+    localparam [DW_ANGLE-1:0]   ANGLE_INPUT_VECTOR  [NUM_INPUTS-1:0]    = {{8'd50},{8'd130},{8'd70},{8'd110},{8'd90}};
     localparam [12:0]           NUM_POINTS_VECTOR   [NUM_INPUTS-1:0]    = {{13'd2990},{13'd2650},{13'd3600},{13'd3300},{13'd2300}};
     // Reference
     real R_0_REAL  [NUM_INPUTS-1:0]                                 = {70.0*10**-3.0,90.0*10**-3.0,30.0*10**-3.0,50.0*10**-3.0,110.0*10**-3.0};
@@ -110,10 +109,9 @@ module tb_Transmitter;
 
 
     Transmitter #(
-                    .DW_INTEGER(DW_INTEGER),
                     .DW_INPUT(DW_INPUT),
-                    .DW_FRACTION(DW_FRACTION),
-                    .ANGLE_DW(ANGLE_DW)
+                    .DW_ANGLE(DW_ANGLE),
+                    .NUM_ELEMENTS(NUM_ELEMENTS)
     ) transmitter_instance (
                     .clk(clk),                // Clock signal
                     .rst(rst),                // Reset signal

@@ -1,31 +1,32 @@
 module CountdownTransmit  #(
-                            parameter N_DW_INTEGER = 13,
-                            parameter DW_FRACTION_INCANDCOMPARE = 4
+                            parameter DW_N_INTEGER = 13,
+                            parameter DW_FRACTION_INCANDCOMPARE = 4,
+                            parameter NUM_ELEMENTS  = 64
                             )(
                             input                                                   clk,                // Clock signal
                             input                                                   rst,                // Reset signal
                             // Input values
                             input                                                   initiate,           // Initiates countdown
-                            input signed [N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0] delayArray[63:0],
-                            input signed [N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0] minValue,
-                            input signed [N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:0] maxValue,
+                            input signed [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0] delayArray[NUM_ELEMENTS-1:0],
+                            input signed [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0] minValue,
+                            input signed [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0] maxValue,
                             // Output values
-                            output [63:0]                                           txArray,
+                            output [NUM_ELEMENTS-1:0]                               txArray,
                             output                                                  done               // Result ready signal
                             );
 
-    logic[N_DW_INTEGER+3:0]   counter;      // TODO: REMOVE FRACTION BEFORE SYNTHESIZINGss
+    logic[DW_N_INTEGER+2:0]   counter;
 
     enum {LOAD, TRANSMIT, IDLE} state, nextState;
 
     // Assign output
     generate
         genvar i;
-        for (i = 0; i < 64; i = i + 1) begin : COMP_INST
-            assign txArray[i] = delayArray[i][N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:DW_FRACTION_INCANDCOMPARE-2] == counter[N_DW_INTEGER+3:1] ? (state == TRANSMIT) : 1'b0;
+        for (i = 0; i < NUM_ELEMENTS; i = i + 1) begin : COMP_INST
+            assign txArray[i] = delayArray[i][DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:DW_FRACTION_INCANDCOMPARE-2] == counter[DW_N_INTEGER+2:0] ? (state == TRANSMIT) : 1'b0;
         end
     endgenerate
-    assign done     = state == TRANSMIT && (counter[N_DW_INTEGER+3:1] == maxValue[N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:DW_FRACTION_INCANDCOMPARE-2]);
+    assign done     = state == TRANSMIT && (counter[DW_N_INTEGER+2:0] == maxValue[DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:DW_FRACTION_INCANDCOMPARE-2]);
 
 
     // Locking next state
@@ -60,10 +61,10 @@ module CountdownTransmit  #(
                     counter         <= '0;
                 end
                 LOAD: begin
-                    counter[N_DW_INTEGER+3:1]   <= minValue[N_DW_INTEGER+DW_FRACTION_INCANDCOMPARE:DW_FRACTION_INCANDCOMPARE-2];
+                    counter[DW_N_INTEGER+2:0]   <= minValue[DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:DW_FRACTION_INCANDCOMPARE-2];
                 end
                 TRANSMIT: begin
-                    counter     <= counter + 2'b10;
+                    counter     <= counter + 1;
                 end
             endcase
         end
