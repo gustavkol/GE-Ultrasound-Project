@@ -20,7 +20,7 @@ module NextPointIncrementTermCalculator  #(
                             output                                      done_configuring                    // Signal going high after configuring is done
                             );
 
-    localparam [5+8-1:0] cordic_const_in = 13'b01000_00100110; // Quantized value for 2 * p * f_s / v_s
+    localparam [5+8-1:0] cordic_const_in = 13'b01000_00100000; // Quantized value for 2 * p * f_s / v_s
 
     // State machine variables
     enum {LOAD, CONFIGURE, WAIT, RUN_NEXT, IDLE} state, nextState;

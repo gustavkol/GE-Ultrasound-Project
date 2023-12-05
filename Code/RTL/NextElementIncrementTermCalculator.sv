@@ -22,7 +22,7 @@ module NextElementIncrementTermCalculator  #(
 
     localparam HALF_ELEMENTS                        = NUM_ELEMENTS/2;
     localparam DW_CONSTANT                          = 6;
-    localparam [DW_CONSTANT+DW_FRACTION-1:0] a_0    = 'b010000_011110; // Quantized value A_0 = 16.46875
+    localparam [DW_CONSTANT+DW_FRACTION-1:0] a_0    = {12'b010000_011110,{DW_FRACTION-DW_CONSTANT{'0}}}; // Quantized value A_0 = 16.46875
     localparam DW_COUNTER                           = 7;
 
     // State machine variables
@@ -107,11 +107,9 @@ module NextElementIncrementTermCalculator  #(
                     // NOTE: -4 because of input fraction in area optimized solution
                     cordic_x_scale      <= (r_0 << 7+(DW_FRACTION-4))           // (2*p*(f_s/v_s)^2) * 10^-3 = 131.767
                                             + (r_0 << 1+(DW_FRACTION-4)) 
-                                            + (r_0 << (DW_FRACTION-4)) 
-                                            + (r_0 << (DW_FRACTION-4)-1) 
-                                            + (r_0 << (DW_FRACTION-4)-2) 
-                                            + (r_0 >> 6-(DW_FRACTION-4)) 
-                                            + (r_0 >>> 9-(DW_FRACTION-4));     
+                                            + (r_0 << (DW_FRACTION-4))
+                                            + (r_0 << (DW_FRACTION-4)-1)
+                                            + (r_0 << (DW_FRACTION-4)-2);    
                     angle_reg           <= angle;
                     cordic_initiate     <= 1'b1;
                 end

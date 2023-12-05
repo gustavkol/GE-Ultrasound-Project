@@ -18,7 +18,7 @@ module TransmitterSpeedOptimized #(
 
     // Calculator parameters
     localparam DW_CALC_INTEGER              = 18;
-    localparam DW_CALC_FRACTION             = 6;
+    localparam DW_CALC_FRACTION             = 7;
     
     // IncrementAndCompare parameters
     localparam DW_INC_TERM_INTEGER          = 16;
@@ -250,8 +250,8 @@ module TransmitterSpeedOptimized #(
                     initiate_transmit                   <= 1'b0;
                     // Synchronizing comparator term calculator and IncrementAndCompare module
                     if (reference_ready && incrementAndCompare_available && initiate_incrementAndCompare == 1'b0) begin  // K_n ready
-                        comp_term_pos_n                 <= reference_output_term_pos_n >>> 2;        // Compensating for DW in fraction
-                        comp_term_neg_n                 <= reference_output_term_neg_n >>> 2;
+                        comp_term_pos_n                 <= reference_output_term_pos_n >>> (DW_CALC_FRACTION - DW_FRACTION_INCANDCOMPARE);        // Compensating for DW in fraction
+                        comp_term_neg_n                 <= reference_output_term_neg_n >>> (DW_CALC_FRACTION - DW_FRACTION_INCANDCOMPARE);
                         initiate_incrementAndCompare    <= 1'b1;
                         reference_ack                   <= 1'b1;
                     end

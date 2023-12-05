@@ -28,18 +28,15 @@ module IncrementAndCompareArray  #(
                             );
 
 
-    logic calc_ready;          // Result ready signal
 
     // IncrementAndCompare inputs/outputs
-    //logic          [DW_N_INTEGER+DW_FRACTION:0]             n_next           [NUM_ELEMENTS-1:0];     // Delay outputs
-    //logic signed   [DW_ERROR_INTEGER+DW_FRACTION:0]         error_next       [NUM_ELEMENTS-1:0];     // Error outputs
-
     logic signed   [DW_A_INTEGER+DW_FRACTION:0]             a_next           [NUM_ELEMENTS-1:0];     // Compensated delays
     logic          [2*DW_A_INTEGER+DW_FRACTION:0]           a_next_sq        [NUM_ELEMENTS-1:0];     // Compensated squared delays
     logic signed   [DW_INC_TERM_INTEGER+DW_FRACTION:0]      comp_term_next   [NUM_ELEMENTS-1:0];     // Comparator term propagated to next
     logic signed   [DW_INC_TERM_INTEGER+DW_FRACTION:0]      comp_terms       [NUM_ELEMENTS-1:0];     // Comparator term propagated to next
 
-    logic [NUM_ELEMENTS-1:0]    ready_reg;             // Result ready signals
+    logic                       calc_ready;                     // Calculator ready signal
+    logic [NUM_ELEMENTS-1:0]    ready_reg;                      // Delay ready signals
     logic                       initiate_incrementAndCompare;
     logic                       rst_calc;
 
@@ -60,7 +57,6 @@ module IncrementAndCompareArray  #(
 
     // Generating one incrementAndCompare for each element
     genvar i;
-
     generate
         for(i = 0; i < NUM_ELEMENTS; i = i + 1) begin
             IncrementAndCompare #(
@@ -98,7 +94,7 @@ module IncrementAndCompareArray  #(
         .DW_ANGLE(DW_ANGLE)
     ) calc_inst (
         .clk(clk),                          // Clock signal
-        .rst(rst_calc),                          // Reset signal
+        .rst(rst_calc),                     // Reset signal
     // Input values
         .configure(configure),              // Signal initiating first calculation and configures values
         .ack(ack),                          // Acknowledges output has been read

@@ -45,6 +45,7 @@ module tb_Transmitter;
     integer             num_assertions;
     real                point_index;
     real                cur_index;
+    real                max_error;
 
 
 
@@ -100,8 +101,9 @@ module tb_Transmitter;
                         else begin 
                             $display ("Over 0.5 error in delay cycles: (error: %f, R_0 = %f, angle = %f, n = %f, point = %f)", diff_hw - diff_theoretic, R_0_REAL[scanline_index], ANGLE_REAL[scanline_index], cur_index, point_index);
                             num_assertions++;
+                            if ($sqrt((diff_hw - diff_theoretic)**2) > max_error)
+                                max_error = $sqrt((diff_hw - diff_theoretic)**2);
                         end
-
                 end
                 point_index = point_index + 1.0;
             end
