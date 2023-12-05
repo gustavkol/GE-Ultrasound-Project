@@ -32,24 +32,35 @@ module TransmitterSpeedOptimized #(
     localparam DW_POINT_COUNTER             = 13;
     localparam HALF_ELEMENTS                = NUM_ELEMENTS/2;
 
-    // Delay values
-    logic [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]    delayArray  [NUM_ELEMENTS-1:0]; // Array holding all delay values
+    // Delay value signals/regs
+    logic [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                delayArray  [NUM_ELEMENTS-1:0]; // Array holding all delay values
     logic signed [DW_ERROR_INTEGER+DW_FRACTION_INCANDCOMPARE:0]     errorArray  [NUM_ELEMENTS-1:0]; // Error outputs
-    logic [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]    delayMin;                       // Holding smallest delay value
-    logic [DW_ELEMENT_COUNTER]                          delayMinIndex;
-    logic [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]    delayMax;                       // Holding largest delay value
-    logic [DW_ELEMENT_COUNTER]                          delayMaxIndex;
-    logic [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]    n_0_reg;                        // Holding value for element n=0
-    logic [DW_INPUT+DW_FRACTION_INCANDCOMPARE-1:0]      r_0_reg;
-    logic [DW_INPUT+DW_FRACTION_INCANDCOMPARE-1:0]      r_0_calc;
-    logic [DW_ANGLE-1:0]                                angle_reg;
-    logic [DW_ANGLE-1:0]                                angle_calc;
+    logic [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                delayMin;                       // Holding smallest delay value
+    logic [DW_ELEMENT_COUNTER]                                      delayMinIndex;
+    logic [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                delayMax;                       // Holding largest delay value
+    logic [DW_ELEMENT_COUNTER]                                      delayMaxIndex;
 
     // NextElementIncrementTermCalculator inputs and outputs
+    logic       reference_calculation_done;
+    logic       reference_ack;
+    logic       reference_ready;
+    logic       initiate_calc;
+    logic       rst_refCalculator;
+    logic       incrementAndCompare_available;
+    logic       incrementAndCompare_available_pos_n;
+    logic       incrementAndCompare_available_neg_n;
+    logic       delay_ready;
+    logic       delay_ready_neg_n;
+    logic       delay_ready_pos_n;
+    logic        [DW_INPUT+DW_FRACTION_INCANDCOMPARE-1:0]                   r_0_calc;
+    logic        [DW_ANGLE-1:0]                                             angle_calc;
     logic signed [DW_CALC_FRACTION+DW_CALC_INTEGER-1:0]                     reference_output_term_pos_n;
     logic signed [DW_CALC_FRACTION+DW_CALC_INTEGER-1:0]                     reference_output_term_neg_n;
 
-    //  ** IncrementAndCompare next element inputs and outputs **  //
+    // IncrementAndCompare next element inputs and outputs
+    logic       initiate_incrementAndCompare;
+    logic       ack_incrementAndCompare;
+    // Positive indexed elements
     logic           [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]              n_prev_pos_n;
     logic signed    [DW_A_INTEGER+DW_FRACTION_INCANDCOMPARE:0]              a_prev_pos_n;
     logic           [2*DW_A_INTEGER+DW_FRACTION_INCANDCOMPARE:0]            a_prev_sq_pos_n;
@@ -62,7 +73,6 @@ module TransmitterSpeedOptimized #(
     logic           [2*DW_A_INTEGER+DW_FRACTION_INCANDCOMPARE:0]            a_next_sq_pos_n;
     logic signed    [DW_INC_TERM_INTEGER+DW_FRACTION_INCANDCOMPARE:0]       comp_term_next_pos_n;
     logic signed    [DW_ERROR_INTEGER+DW_FRACTION_INCANDCOMPARE:0]          error_next_pos_n;
-
     // Negative indexed elements
     logic           [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]              n_prev_neg_n;
     logic signed    [DW_A_INTEGER+DW_FRACTION_INCANDCOMPARE:0]              a_prev_neg_n;
@@ -78,61 +88,38 @@ module TransmitterSpeedOptimized #(
     logic signed    [DW_ERROR_INTEGER+DW_FRACTION_INCANDCOMPARE:0]          error_next_neg_n;
 
 
-
-    // Positive indexed elements
-    logic initiate_incrementAndCompare;
-    logic ack_incrementAndCompare;
-
     // Array inputs/outputs
-    logic [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]        delay_array_calc        [NUM_ELEMENTS-1:0];      // Output delays for all elements
-    logic signed [DW_ERROR_INTEGER+DW_FRACTION_INCANDCOMPARE:0]         error_array_calc        [NUM_ELEMENTS-1:0]; // Error outputs
-    logic ack_array;
-    logic array_ready;
-    logic done_configuring_array;
+    logic       rst_array;
+    logic       ack_array;
+    logic       array_ready;
+    logic       done_configuring_array;
+    logic        [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]         delay_array_calc        [NUM_ELEMENTS-1:0]; // Output delays for all elements
+    logic signed [DW_ERROR_INTEGER+DW_FRACTION_INCANDCOMPARE:0]     error_array_calc        [NUM_ELEMENTS-1:0]; // Error outputs
 
-    
-
-    // ** Control signals ** //
+    // FSM signals
+    enum {LOAD, NEXT_ELEMENT_CALC, LOAD_NEXT, TRANSMIT, IDLE} state, nextState;
+    logic                           final_scanpoint;
     logic [DW_ELEMENT_COUNTER-1:0]  element_counter;
     logic [DW_POINT_COUNTER-1:0]    point_counter;
-    logic                           point_counter_prev_index_7;
     logic [DW_POINT_COUNTER-1:0]    num_points_reg;
-    logic                           final_scanpoint;
-    // reference calculator
-    logic       reference_ack;
-    logic       reference_calculation_done;
-    logic       reference_ready;
-    logic       initiate_calc;
-    logic       initiate_calc_reg;
-    logic       rst_refCalculator;
-    
-    logic       rst_array;
 
-    logic       incrementAndCompare_available;
-    logic       incrementAndCompare_available_pos_n;
-    logic       incrementAndCompare_available_neg_n;
-
-    logic       delay_ready;
-    logic       delay_ready_neg_n;
-    logic       delay_ready_pos_n;
-
-    // transmit
+    // Transmit signals
     logic       initiate_transmit;
     logic       transmit_done;
 
-    enum {LOAD, NEXT_ELEMENT_CALC, LOAD_NEXT, TRANSMIT, IDLE} state, nextState;
 
-    assign delay_ready                      = delay_ready_neg_n && delay_ready_pos_n;
-    assign incrementAndCompare_available    = incrementAndCompare_available_neg_n && incrementAndCompare_available_pos_n;
+    assign rst_refCalculator                = rst || done;                                                                  // Resets referece calculator when scanline completed
+    assign initiate_calc                    = (state == IDLE && initiate);                                                  // Initiates calculator to start scanline
+    assign incrementAndCompare_available    = incrementAndCompare_available_neg_n && incrementAndCompare_available_pos_n;   // Indicating incrementAndCompare available for pos and neg index
+    assign delay_ready                      = delay_ready_neg_n && delay_ready_pos_n;                                       // Indicating both pos and neg indexed delay values ready
+    
+    assign angle_calc                       = (state == LOAD) ? angle : '0;                                                 // Input to reference calculator
+    assign r_0_calc                         = (state == LOAD) ? {r_0,4'd0} : '0;                                            // Input to reference calculator
 
-    assign final_scanpoint                  = (point_counter == num_points_reg && state == TRANSMIT) ? 1'b1 : 1'b0;
-    assign done                             = transmit_done && final_scanpoint;
-    assign rst_refCalculator                = rst || done;
-    assign rst_array                        = rst || done;
+    assign rst_array                        = rst || done;                                                                  // Resets array calculation when scanline completed
 
-    assign initiate_calc                    = (state == IDLE && initiate) || initiate_calc_reg;
-    assign r_0_calc                         = (state == LOAD) ? {r_0,4'd0} : r_0_reg;
-    assign angle_calc                       = (state == LOAD) ? angle : angle_reg;
+    assign final_scanpoint                  = (point_counter == num_points_reg && state == TRANSMIT) ? 1'b1 : 1'b0;         // Indicating final point of scanline
+    assign done                             = transmit_done && final_scanpoint;                                             // Indicates when a scanline has completed
 
     // Locking next state
     always @(posedge clk) begin
@@ -181,12 +168,7 @@ module TransmitterSpeedOptimized #(
             initiate_transmit               <= '0;
             ack_incrementAndCompare         <= '0;
             initiate_incrementAndCompare    <= '0;
-            initiate_calc_reg               <= '0;
-            angle_reg                       <= '0;
-            r_0_reg                         <= '0;
             num_points_reg                  <= '0;
-            n_0_reg                         <= '0;
-            point_counter_prev_index_7      <= '0;
             ack_array                       <= '0;
             delayMinIndex                   <= '0;
             delayMaxIndex                   <= '0;
@@ -197,7 +179,7 @@ module TransmitterSpeedOptimized #(
         end
         else begin
             case(state)
-                IDLE: begin     // RESET ALL VALUES
+                IDLE: begin
                     delayMin                        <= '0;
                     delayMax                        <= '0;
                     reference_ack                   <= '0;
@@ -218,12 +200,7 @@ module TransmitterSpeedOptimized #(
                     initiate_transmit               <= '0;
                     ack_incrementAndCompare         <= '0;
                     initiate_incrementAndCompare    <= '0;
-                    initiate_calc_reg               <= '0;
-                    angle_reg                       <= '0;
-                    r_0_reg                         <= '0;
                     num_points_reg                  <= '0;
-                    n_0_reg                         <= '0;
-                    point_counter_prev_index_7      <= 1'b1;
                     ack_array                       <= '0;
                     delayMinIndex                   <= '0;
                     delayMaxIndex                   <= '0;
@@ -238,11 +215,8 @@ module TransmitterSpeedOptimized #(
                     delayArray[HALF_ELEMENTS-1] <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);
                     delayMin                    <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);
                     delayMax                    <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);
-                    delayMinIndex               <= 31;
-                    delayMaxIndex               <= 31;
-                    n_0_reg                     <= (r_0 << 4+DW_FRACTION_INCANDCOMPARE) + (r_0 << DW_FRACTION_INCANDCOMPARE-2) - (r_0 << DW_FRACTION_INCANDCOMPARE-6);
-                    r_0_reg                     <= {r_0,4'd0};
-                    angle_reg                   <= angle;
+                    delayMinIndex               <= HALF_ELEMENTS-1;
+                    delayMaxIndex               <= HALF_ELEMENTS-1;
                     num_points_reg              <= num_points;
                     element_counter             <= 1;
                 end
@@ -260,7 +234,7 @@ module TransmitterSpeedOptimized #(
                         initiate_incrementAndCompare    <= 1'b0;
                     end
 
-                    // When IncrementAndCompare is done
+                    // When IncrementAndCompare is done, store delay pos and neg indexed delay values
                     if (delay_ready && ack_incrementAndCompare == 1'b0) begin
                         // Storing delay value
                         delayArray[HALF_ELEMENTS-1+element_counter]  <= n_next_pos_n;
@@ -273,24 +247,24 @@ module TransmitterSpeedOptimized #(
                         if (n_next_pos_n < delayMin || n_next_neg_n < delayMin)
                             if (n_next_pos_n < n_next_neg_n) begin
                                 delayMin            <= n_next_pos_n;
-                                delayMinIndex       <= 31 + element_counter;
+                                delayMinIndex       <= HALF_ELEMENTS - 1 + element_counter;
                             end
                             else if (element_counter < HALF_ELEMENTS) begin
                                 delayMin            <= n_next_neg_n;
-                                delayMinIndex       <= 31 - signed'(element_counter);
+                                delayMinIndex       <= HALF_ELEMENTS - 1 - signed'(element_counter);
                             end
 
                         if (n_next_pos_n > delayMax || n_next_neg_n > delayMax)
                             if (n_next_pos_n > n_next_neg_n) begin
                                 delayMax            <= n_next_pos_n;
-                                delayMaxIndex       <= 31 + element_counter;
+                                delayMaxIndex       <= HALF_ELEMENTS - 1 + element_counter;
                             end
                             else if (element_counter < HALF_ELEMENTS) begin
                                 delayMax            <= n_next_neg_n;
-                                delayMaxIndex       <= 31 - signed'(element_counter);
+                                delayMaxIndex       <= HALF_ELEMENTS - 1 - signed'(element_counter);
                             end
 
-                        // Feedback to IncrementAndCompare NOTE: SHOULD BE REMOVED?????
+                        // Feedback to IncrementAndCompare
                         n_prev_pos_n                  <= n_next_pos_n;
                         a_prev_pos_n                  <= a_next_pos_n;
                         a_prev_sq_pos_n               <= a_next_sq_pos_n;
@@ -331,11 +305,11 @@ module TransmitterSpeedOptimized #(
                 end
                 LOAD_NEXT: begin
                     ack_array           <= 1'b0;
-                    initiate_calc_reg   <= 1'b0;
                     if (array_ready) begin
                         delayArray          <= delay_array_calc;
                         errorArray          <= error_array_calc;
 
+                        // Logic for storing max and min delay values
                         case(delayMinIndex)
                             NUM_ELEMENTS-1: begin
                                 if (delay_array_calc[delayMinIndex] <= delay_array_calc[delayMinIndex-1]) begin
@@ -442,7 +416,7 @@ module TransmitterSpeedOptimized #(
         .ready(reference_ready)
     );
 
-    // Instantiating the incrementAndCompare module
+    // Instantiating the incrementAndCompare modules for reference point
     IncrementAndCompare #(
         .DW_INC_TERM_INTEGER(DW_INC_TERM_INTEGER),
         .DW_N_INTEGER(DW_N_INTEGER),
@@ -471,7 +445,6 @@ module TransmitterSpeedOptimized #(
         .available(incrementAndCompare_available_pos_n)
     );
 
-    // Instantiating the incrementAndCompare module
     IncrementAndCompare #(
         .DW_INC_TERM_INTEGER(DW_INC_TERM_INTEGER),
         .DW_N_INTEGER(DW_N_INTEGER),
@@ -500,6 +473,7 @@ module TransmitterSpeedOptimized #(
         .available(incrementAndCompare_available_neg_n)
     );
 
+    // Instantiating array module computing delays for points k > 0
     IncrementAndCompareArray  #(
         .DW_INC_TERM_INTEGER(DW_INC_TERM_INTEGER),
         .DW_N_INTEGER(DW_N_INTEGER),
@@ -508,8 +482,8 @@ module TransmitterSpeedOptimized #(
         .DW_FRACTION(DW_FRACTION_INCANDCOMPARE),
         .NUM_ELEMENTS(NUM_ELEMENTS)
     ) inst_array (
-        .clk(clk),                                  // Clock signal
-        .rst(rst_array),                                  // Reset signal
+        .clk(clk),
+        .rst(rst_array),
         // Input values
         .r_0(r_0),
         .angle(angle),
@@ -520,13 +494,13 @@ module TransmitterSpeedOptimized #(
         .ack(ack_array),
         .final_scanpoint(final_scanpoint),
         // Output values
-        .n_out(delay_array_calc),                    // Output delays for all elements
+        .n_out(delay_array_calc),
         .error_out(error_array_calc),
-        .ready(array_ready),                                    // Result ready signal
+        .ready(array_ready),
         .done_configuring(done_configuring_array)
     );
 
-
+    // Instantiation module generating transmit enable outputs
     CountdownTransmit  #(
         .DW_N_INTEGER(DW_N_INTEGER),
         .DW_FRACTION_INCANDCOMPARE(DW_FRACTION_INCANDCOMPARE)                        

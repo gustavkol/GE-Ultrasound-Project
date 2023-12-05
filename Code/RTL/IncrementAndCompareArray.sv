@@ -11,20 +11,20 @@ module IncrementAndCompareArray  #(
                             )(
                             input                                               clk,                                // Clock signal
                             input                                               rst,                                // Reset signal
-                            // Input values
-                            input [DW_INPUT-1:0]                                r_0,                // R_0 input
-                            input [DW_ANGLE-1:0]                                angle,              // angle input
-                            input                                               configure,
-                            input          [DW_N_INTEGER+DW_FRACTION:0]         n_prev      [NUM_ELEMENTS-1:0],      // Output delays for all elements
-                            input signed   [DW_ERROR_INTEGER+DW_FRACTION:0]     error_prev  [NUM_ELEMENTS-1:0],
-                            input                                               ack,                               // Acknowledges output has been read
-                            input                                               transmit_done,
-                            input                                               final_scanpoint,
-                            // Output values
+                            // Input signals
+                            input [DW_INPUT-1:0]                                r_0,                                // R_0 input
+                            input [DW_ANGLE-1:0]                                angle,                              // angle input
+                            input                                               configure,                          // Configure calculator signal
+                            input          [DW_N_INTEGER+DW_FRACTION:0]         n_prev      [NUM_ELEMENTS-1:0],     // Previous delays for all elements
+                            input signed   [DW_ERROR_INTEGER+DW_FRACTION:0]     error_prev  [NUM_ELEMENTS-1:0],     // Previous error terms
+                            input                                               ack,                                // Acknowledges output has been read
+                            input                                               transmit_done,                      // Transmit done signal
+                            input                                               final_scanpoint,                    // Final scanpoint in scanline signal
+                            // Output signals
                             output          [DW_N_INTEGER+DW_FRACTION:0]        n_out      [NUM_ELEMENTS-1:0],      // Output delays for all elements
-                            output signed   [DW_ERROR_INTEGER+DW_FRACTION:0]    error_out  [NUM_ELEMENTS-1:0],
-                            output                                              ready,                               // Result ready signal
-                            output                                              done_configuring
+                            output signed   [DW_ERROR_INTEGER+DW_FRACTION:0]    error_out  [NUM_ELEMENTS-1:0],      // Error propagated to next
+                            output                                              ready,                              // Result ready signal
+                            output                                              done_configuring                    // Done configuring calculator signal
                             );
 
 
@@ -33,17 +33,18 @@ module IncrementAndCompareArray  #(
     logic signed   [DW_A_INTEGER+DW_FRACTION:0]             a_next           [NUM_ELEMENTS-1:0];     // Compensated delays
     logic          [2*DW_A_INTEGER+DW_FRACTION:0]           a_next_sq        [NUM_ELEMENTS-1:0];     // Compensated squared delays
     logic signed   [DW_INC_TERM_INTEGER+DW_FRACTION:0]      comp_term_next   [NUM_ELEMENTS-1:0];     // Comparator term propagated to next
-    logic signed   [DW_INC_TERM_INTEGER+DW_FRACTION:0]      comp_terms       [NUM_ELEMENTS-1:0];     // Comparator term propagated to next
+    logic signed   [DW_INC_TERM_INTEGER+DW_FRACTION:0]      comp_terms       [NUM_ELEMENTS-1:0];     // Comparator terms from calculator
 
     logic                       calc_ready;                     // Calculator ready signal
     logic [NUM_ELEMENTS-1:0]    ready_reg;                      // Delay ready signals
-    logic                       initiate_incrementAndCompare;
-    logic                       rst_calc;
+    logic                       initiate_incrementAndCompare;   // Initiates incrementAndCompare modules
+    logic                       rst_calc;                       // Resets calculator
 
     // Assigning outputs
     assign ready            = (ready_reg == '1);
     assign rst_calc         = rst || final_scanpoint;
 
+    // Synchronizing calculator and incrementAndCompare modules
     always_ff @(posedge clk) begin
         if (rst) begin
             initiate_incrementAndCompare    <= '0;
@@ -91,19 +92,20 @@ module IncrementAndCompareArray  #(
 
     NextPointIncrementTermCalculator  #(
         .DW_INPUT(DW_INPUT),
-        .DW_ANGLE(DW_ANGLE)
+        .DW_ANGLE(DW_ANGLE),
+        .DW_INC_AND_COMP_FRACTION(DW_FRACTION)
     ) calc_inst (
         .clk(clk),                          // Clock signal
         .rst(rst_calc),                     // Reset signal
-    // Input values
+        // Input
         .configure(configure),              // Signal initiating first calculation and configures values
         .ack(ack),                          // Acknowledges output has been read
         .final_scanpoint(final_scanpoint),  // Signal indicating last point of scanline
         .r_0(r_0),                          // R_0 input
         .angle(angle),                      // angle input
-    // Output values
-        .output_terms(comp_terms),          // Comparator term output for pos n
-        .done_configuring(done_configuring),
+        // Output
+        .output_terms(comp_terms),          // Comparator terms for all n
+        .done_configuring(done_configuring),// Done configuring signal
         .ready(calc_ready)                  // Result ready signal
     );
 
