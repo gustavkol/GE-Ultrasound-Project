@@ -132,7 +132,7 @@ module NextElementIncrementTermCalculator  #(
                     output_term_pos_n_reg   <= output_term_pos_n_reg + (a_0 << 1);    // A_0 * (2*n + 1) - C_0
                     output_term_neg_n_reg   <= output_term_neg_n_reg + (a_0 << 1);    // A_0 * (2*n + 1) + C_0
                     ready_reg               <= 1'b1;
-                    if (counter == HALF_ELEMENTS)
+                    if (counter == HALF_ELEMENTS-2)
                         last_element_reg    <= 1'b1;
                     else
                         counter         <= counter + 1;

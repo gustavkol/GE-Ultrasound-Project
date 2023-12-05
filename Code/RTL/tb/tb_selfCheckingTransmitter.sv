@@ -96,7 +96,7 @@ module tb_Transmitter;
                     diff_theoretic  = reference_delay - n_0_theoretic;
                     diff_hw         = SF*transmitter_instance.delayArray[n] - n_0_hw;
                     
-                    assert (diff_theoretic - diff_hw < 0.5) 
+                    assert (diff_theoretic - diff_hw < 0.5 && diff_theoretic - diff_hw > -0.5) 
                         else begin 
                             $display ("Over 0.5 error in delay cycles: (error: %f, R_0 = %f, angle = %f, n = %f, point = %f)", diff_hw - diff_theoretic, R_0_REAL[scanline_index], ANGLE_REAL[scanline_index], cur_index, point_index);
                             num_assertions++;

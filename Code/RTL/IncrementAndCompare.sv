@@ -57,11 +57,11 @@ module IncrementAndCompare  #(
     logic   ready_reg;
 
     // Assigning regs to output
-    assign n_next           = (state == WAIT) ? n_cur_reg           : '0;
-    assign error_next       = (state == WAIT) ? error_cur_reg       : '0;
-    assign a_next           = (state == WAIT) ? a_cur_reg           : '0;
-    assign a_next_sq        = (state == WAIT) ? a_cur_sq_reg        : '0;
-    assign comp_term_next   = (state == WAIT) ? comp_term_next_reg  : '0;
+    assign n_next           = /*(state == WAIT) ? */n_cur_reg;//           : '0;
+    assign error_next       = /*(state == WAIT) ? */error_cur_reg;//       : '0;
+    assign a_next           = /*(state == WAIT) ? */a_cur_reg;//           : '0;
+    assign a_next_sq        = /*(state == WAIT) ? */a_cur_sq_reg;//        : '0;
+    assign comp_term_next   = /*(state == WAIT) ? */comp_term_next_reg;//  : '0;
     assign ready            = (state == WAIT) ? ready_reg           : '0;
     assign available        = (state == IDLE);
 
@@ -124,13 +124,13 @@ module IncrementAndCompare  #(
         else begin
             case(state)
                 IDLE: begin
-                    comp_term_cur_reg           <= '0;
-                    comp_term_next_reg          <= '0;
-                    n_cur_reg                   <= '0;
+                    //comp_term_cur_reg           <= '0;
+                    //comp_term_next_reg          <= '0;
+                    //n_cur_reg                   <= '0;
                     error_cur_reg               <= '0;
-                    a_cur_reg                   <= '0;
+                    //a_cur_reg                   <= '0;
                     a_prev_reg                  <= '0;
-                    a_cur_sq_reg                <= '0;
+                    //a_cur_sq_reg                <= '0;
                     a_prev_sq_reg               <= '0;
                     sign_bit                    <= '0;
                     a_mul_n_integer_reg         <= '0;

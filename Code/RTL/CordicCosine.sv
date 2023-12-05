@@ -1,6 +1,6 @@
 module CordicCosine # (
                     DW_ANGLE                = 8,
-                    DW_FRACTION             = 8,
+                    DW_FRACTION             = 6,
                     DW_CALCULATION_TERMS    = 16,
                     NUM_ITERATIONS          = 11
                 )(
@@ -37,9 +37,9 @@ module CordicCosine # (
     enum {LOAD, RUN, WAIT, IDLE} state, nextState;
 
     // Internal registers
-    logic signed [DW_CALCULATION_TERMS+DW_FRACTION:0]   x_cur_reg;            // NOTE: may not have to be signed
-    logic signed [DW_CALCULATION_TERMS+DW_FRACTION:0]   y_cur_reg;            // NOTE: may not have to be signed
-    logic signed [DW_ANGLE+DW_FRACTION:0]               angle_cur_reg;        // NOTE: may not have to be signed
+    logic signed [DW_CALCULATION_TERMS+DW_FRACTION:0]   x_cur_reg;
+    logic signed [DW_CALCULATION_TERMS+DW_FRACTION:0]   y_cur_reg;
+    logic signed [DW_ANGLE+DW_ROTATED_ANGLE_FRACTION:0] angle_cur_reg;
     logic                                               sign_bit;
     logic                                               sign_increment;
     logic                                               done_reg;

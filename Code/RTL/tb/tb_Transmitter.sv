@@ -1,18 +1,18 @@
 `timescale 1 ns / 1 ps
 module tb_Transmitter;
-    parameter DW_INTEGER    = 18;
-    parameter DW_FRACTION   = 8;
-    parameter ANGLE_DW      = 8;
+
+    parameter DW_ANGLE      = 8;
     parameter DW_INPUT      = 8;
+    parameter NUM_ELEMENTS  = 64;
 
     // input signals
     reg                             clk, rst, initiate;
     reg [DW_INPUT-1:0]              r_0;
-    reg [ANGLE_DW-1:0]              angle;
+    reg [DW_ANGLE-1:0]              angle;
     reg [12:0]                      num_points;
 
     // output signals
-    wire [63:0]                         txArray;
+    wire [NUM_ELEMENTS-1:0]             txArray;
     wire                                done;
 
     integer i;
@@ -39,10 +39,9 @@ module tb_Transmitter;
 
 
     Transmitter #(
-                    .DW_INTEGER(DW_INTEGER),
                     .DW_INPUT(DW_INPUT),
-                    .DW_FRACTION(DW_FRACTION),
-                    .ANGLE_DW(ANGLE_DW)
+                    .DW_ANGLE(DW_ANGLE),
+                    .NUM_ELEMENTS(NUM_ELEMENTS)
     ) transmitter_instance (
                     .clk(clk),                // Clock signal
                     .rst(rst),                // Reset signal
