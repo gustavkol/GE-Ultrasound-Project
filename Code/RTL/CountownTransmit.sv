@@ -30,7 +30,7 @@ module CountdownTransmit  #(
 
 
     // Locking next state
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if(rst) 
             state <= IDLE;
         else
@@ -51,7 +51,7 @@ module CountdownTransmit  #(
     end
 
 
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if(rst) begin
             counter         <= '0;
         end

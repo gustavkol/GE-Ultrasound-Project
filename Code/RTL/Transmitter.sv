@@ -120,7 +120,7 @@ module Transmitter #(
     assign angle_calc                       = (state == LOAD) ? angle : angle_reg;
 
     // Locking next state
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if(rst) 
             state <= IDLE;
         else
@@ -144,7 +144,7 @@ module Transmitter #(
     end
 
     // System functionality
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (rst) begin
             delayMin                        <= '0;
             delayMax                        <= '0;
@@ -173,7 +173,7 @@ module Transmitter #(
             n_0_reg                         <= '0;
             point_counter_prev_index_7      <= '0;
             for (int i = 0; i < NUM_ELEMENTS; i = i + 1) begin
-                delayArray[i] = '0;
+                delayArray[i] <= '0;
             end
         end
         else begin
@@ -206,7 +206,7 @@ module Transmitter #(
                     n_0_reg                         <= '0;
                     point_counter_prev_index_7      <= 1'b1;
                     for (int i = 0; i < NUM_ELEMENTS; i = i + 1) begin
-                        delayArray[i] = '0;
+                        delayArray[i] <= '0;
                     end
                 end
                 LOAD: begin // CONST MULTIPLIER

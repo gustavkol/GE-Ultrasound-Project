@@ -66,7 +66,7 @@ module NextPointIncrementTermCalculator  #(
 
 
     // Locking next state
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if(rst) 
             state <= IDLE;
         else
@@ -92,7 +92,7 @@ module NextPointIncrementTermCalculator  #(
     end
 
     // Calculation functionality
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (rst) begin
             cordic_x_scale          <= '0;
             angle_reg               <= '0;
@@ -104,8 +104,8 @@ module NextPointIncrementTermCalculator  #(
             cordic_ack              <= 1'b0;
             done_configuring_reg    <= 1'b0;
             for (int i = 0; i <= HALF_ELEMENTS; i = i + 1) begin
-                output_term_neg_n_reg[i] = '0;
-                output_term_pos_n_reg[i] = '0;
+                output_term_neg_n_reg[i] <= '0;
+                output_term_pos_n_reg[i] <= '0;
             end
         end
         else begin
@@ -121,8 +121,8 @@ module NextPointIncrementTermCalculator  #(
                     cordic_ack              <= 1'b0;
                     done_configuring_reg    <= 1'b0;
                     for (int i = 0; i <= HALF_ELEMENTS; i = i + 1) begin
-                        output_term_neg_n_reg[i] = '0;
-                        output_term_pos_n_reg[i] = '0;
+                        output_term_neg_n_reg[i] <= '0;
+                        output_term_pos_n_reg[i] <= '0;
                     end
                 end
                 LOAD: begin
@@ -159,8 +159,8 @@ module NextPointIncrementTermCalculator  #(
                 end
                 RUN_NEXT: begin // Calculating L_(k+1)n for all n
                     for (int i = 0; i <= HALF_ELEMENTS; i = i + 1) begin
-                        output_term_neg_n_reg[i] = output_term_neg_n_reg[i] + {3'b010,{DW_FRACTION{'0}}};      // +2 for each point k
-                        output_term_pos_n_reg[i] = output_term_pos_n_reg[i] + {3'b010,{DW_FRACTION{'0}}};      // +2 for each point k
+                        output_term_neg_n_reg[i] <= output_term_neg_n_reg[i] + {3'b010,{DW_FRACTION{'0}}};      // +2 for each point k
+                        output_term_pos_n_reg[i] <= output_term_pos_n_reg[i] + {3'b010,{DW_FRACTION{'0}}};      // +2 for each point k
                     end
                     ready_reg   <= 1'b1;
                 end

@@ -78,7 +78,7 @@ module IncrementAndCompare  #(
 
 
     // Locking next state
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if(rst) 
             state <= IDLE;
         else
@@ -103,7 +103,7 @@ module IncrementAndCompare  #(
     end
 
     // Algorithm functionality
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (rst) begin
             comp_term_cur_reg           <= '0;
             comp_term_next_reg          <= '0;

@@ -52,7 +52,7 @@ module NextElementIncrementTermCalculator  #(
     assign last_element         = last_element_reg;
 
     // Locking next state
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if(rst) 
             state <= IDLE;
         else
@@ -78,7 +78,7 @@ module NextElementIncrementTermCalculator  #(
     end
 
     // Calculation functionality
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (rst) begin
             cordic_x_scale          <= '0;
             output_term_pos_n_reg   <= '0;

@@ -54,7 +54,7 @@ module CordicCosine # (
 
 
     // Locking next state
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if(rst) 
             state <= IDLE;
         else
@@ -76,7 +76,7 @@ module CordicCosine # (
     end
 
     // Algorithm
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if(rst) begin
             x_cur_reg       <= '0;
             y_cur_reg       <= '0;

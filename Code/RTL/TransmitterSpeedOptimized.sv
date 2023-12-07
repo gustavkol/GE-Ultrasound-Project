@@ -36,9 +36,9 @@ module TransmitterSpeedOptimized #(
     logic [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                delayArray  [NUM_ELEMENTS-1:0]; // Array holding all delay values
     logic signed [DW_ERROR_INTEGER+DW_FRACTION_INCANDCOMPARE:0]     errorArray  [NUM_ELEMENTS-1:0]; // Error outputs
     logic [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                delayMin;                       // Holding smallest delay value
-    logic [DW_ELEMENT_COUNTER]                                      delayMinIndex;
+    logic [DW_ELEMENT_COUNTER:0]                                    delayMinIndex;
     logic [DW_N_INTEGER+DW_FRACTION_INCANDCOMPARE:0]                delayMax;                       // Holding largest delay value
-    logic [DW_ELEMENT_COUNTER]                                      delayMaxIndex;
+    logic [DW_ELEMENT_COUNTER:0]                                    delayMaxIndex;
 
     // NextElementIncrementTermCalculator inputs and outputs
     logic       reference_calculation_done;
@@ -122,7 +122,7 @@ module TransmitterSpeedOptimized #(
     assign done                             = transmit_done && final_scanpoint;                                             // Indicates when a scanline has completed
 
     // Locking next state
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if(rst) 
             state <= IDLE;
         else
@@ -146,7 +146,7 @@ module TransmitterSpeedOptimized #(
     end
 
     // System functionality
-    always @(posedge clk) begin
+    always_ff @(posedge clk) begin
         if (rst) begin
             delayMin                        <= '0;
             delayMax                        <= '0;
@@ -173,8 +173,8 @@ module TransmitterSpeedOptimized #(
             delayMinIndex                   <= '0;
             delayMaxIndex                   <= '0;
             for (int i = 0; i < NUM_ELEMENTS; i = i + 1) begin
-                delayArray[i] = '0;
-                errorArray[i] = '0;
+                delayArray[i] <= '0;
+                errorArray[i] <= '0;
             end
         end
         else begin
@@ -205,8 +205,8 @@ module TransmitterSpeedOptimized #(
                     delayMinIndex                   <= '0;
                     delayMaxIndex                   <= '0;
                     for (int i = 0; i < NUM_ELEMENTS; i = i + 1) begin
-                        delayArray[i] = '0;
-                        errorArray[i] = '0;
+                        delayArray[i] <= '0;
+                        errorArray[i] <= '0;
                     end
                 end
                 LOAD: begin // CONST MULTIPLIER
